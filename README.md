@@ -1,0 +1,5 @@
+# WebGL2 Template
+
+This project is a minimal yet powerful starting point for anyone looking to explore 3D graphics in the browser using WebGL2. It provides a streamlined foundation with all the essentials: a dynamically resizing canvas, an interactive camera system, and a basic rendering pipeline. The setup is designed to be intuitive, allowing users to manipulate the scene by rotating, panning, and zooming with simple mouse inputs. The rendering logic is clean and focused, showcasing how to create a cube with proper geometry, textures, and custom shaders that handle transformations and basic lighting.
+
+Perfect for beginners and advanced users alike, this example balances simplicity with functionality, making it an excellent tool for learning or prototyping. The code demonstrates the essential steps to set up a WebGL2 context, write and use shaders, and render 3D models in real time. With this as a starting point, you can quickly build upon it to create more complex scenes, integrate advanced shaders, or explore new rendering techniques, all while maintaining clarity and performance.
