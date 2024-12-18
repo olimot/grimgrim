@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  base: `/${import.meta.url.split("/").at(-2)}`,
+  base: "",
   root: "src",
   build: {
     target: "esnext",
