@@ -1,5 +1,5 @@
-
 #screen {
-  width: 640px;
-  height: 360px;
+  outline: 1px solid #e0e0e0;
+  image-rendering: crisp-edges; /* for firefox */
+  image-rendering: pixelated; /* for everything else */
 }
