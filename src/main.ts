@@ -91,7 +91,7 @@ window.addEventListener("load", () => {
     gl.ONE,
     gl.ONE_MINUS_SRC_ALPHA,
   );
-  gl.blendEquation(gl.MAX);
+  gl.blendEquation(gl.FUNC_ADD);
   gl.colorMask(true, true, true, true);
   gl.clearColor(0, 0, 0, 1);
   gl.clearDepth(1);
@@ -113,14 +113,14 @@ window.addEventListener("load", () => {
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint8Array(ids), gl.STATIC_DRAW);
   gl.bindVertexArray(null);
 
-  const brushSample = createBrushCanvas();
   const brushTex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, brushTex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   const { UNSIGNED_BYTE, RGBA } = gl;
-  gl.texImage2D(gl.TEXTURE_2D, 0, RGBA, RGBA, UNSIGNED_BYTE, brushSample);
+  const sampleBrush = createBrushCanvas();
+  sampleBrush(gl, brushTex, 0);
 
   const [program, u] = createImageShader(gl);
   gl.useProgram(program);
@@ -133,7 +133,7 @@ window.addEventListener("load", () => {
   gl.bindVertexArray(vao);
 
   const layer0 = gl.createTexture();
-  const [w, h] = [1280, 720];
+  const [w, h] = [gl.drawingBufferWidth, gl.drawingBufferHeight];
   gl.bindTexture(gl.TEXTURE_2D, layer0);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
@@ -164,6 +164,7 @@ window.addEventListener("load", () => {
   gl.uniformMatrix4fv(u.model, false, model);
   gl.drawElements(gl.TRIANGLES, ids.length, gl.UNSIGNED_BYTE, 0);
 
+  const brushSize = 256;
   let [x0, y0] = [NaN, NaN];
   let brushPointerId = -1;
   const brush = (event = new PointerEvent("")) => {
@@ -177,17 +178,17 @@ window.addEventListener("load", () => {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.viewport(0, 0, w, h);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_COLOR);
 
     gl.activeTexture(gl.TEXTURE0 + 0);
     gl.bindTexture(gl.TEXTURE_2D, brushTex);
     mat4.ortho(projection, 0, w, h, 0, 0, 1);
     gl.uniformMatrix4fv(u.projection, false, projection);
-    const scale = vec3.fromValues(brushSample.width, brushSample.height, 1);
-    const cos = [-brushSample.width / 2, -brushSample.height / 2];
-
+    const scale = vec3.fromValues(brushSize, brushSize, 1);
+    const toCenter = -brushSize / 2;
     for (const [x, y] of bline(x0, y0, x1, y1)) {
       mat4.identity(model);
-      mat4.translate(model, model, [x + cos[0], y + cos[1], 0]);
+      mat4.translate(model, model, [x + toCenter, y + toCenter, 0]);
       mat4.scale(model, model, scale);
       gl.uniformMatrix4fv(u.model, false, model);
       gl.drawElements(gl.TRIANGLES, ids.length, gl.UNSIGNED_BYTE, 0);
@@ -195,6 +196,12 @@ window.addEventListener("load", () => {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.blendFuncSeparate(
+      gl.SRC_ALPHA,
+      gl.ONE_MINUS_SRC_ALPHA,
+      gl.ONE,
+      gl.ONE_MINUS_SRC_ALPHA,
+    );
 
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     mat4.ortho(projection, 0, canvas.width, canvas.height, 0, 0, 1);
