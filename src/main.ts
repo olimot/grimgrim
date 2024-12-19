@@ -91,9 +91,9 @@ window.addEventListener("load", () => {
     gl.ONE,
     gl.ONE_MINUS_SRC_ALPHA,
   );
-  gl.blendEquation(gl.FUNC_ADD);
+  gl.blendEquation(gl.MAX);
   gl.colorMask(true, true, true, true);
-  gl.clearColor(1, 1, 1, 1);
+  gl.clearColor(0, 0, 0, 1);
   gl.clearDepth(1);
 
   const vertices = [0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0];
@@ -150,9 +150,11 @@ window.addEventListener("load", () => {
     0,
   );
   gl.viewport(0, 0, w, h);
+  gl.clear(gl.COLOR_BUFFER_BIT);
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.activeTexture(gl.TEXTURE0 + 0);
   gl.bindTexture(gl.TEXTURE_2D, layer0);
@@ -175,6 +177,7 @@ window.addEventListener("load", () => {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
     gl.viewport(0, 0, w, h);
+
     gl.activeTexture(gl.TEXTURE0 + 0);
     gl.bindTexture(gl.TEXTURE_2D, brushTex);
     mat4.ortho(projection, 0, w, h, 0, 0, 1);
@@ -192,6 +195,7 @@ window.addEventListener("load", () => {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, canvas.width, canvas.height);
+
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     mat4.ortho(projection, 0, canvas.width, canvas.height, 0, 0, 1);
     gl.uniformMatrix4fv(u.projection, false, projection);
