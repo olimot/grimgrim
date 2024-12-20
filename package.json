@@ -15,6 +15,7 @@
     "vite": "^5.4.7"
   },
   "dependencies": {
-    "gl-matrix": "^3.4.3"
+    "gl-matrix": "^3.4.3",
+    "highlight.js": "^11.11.0"
   }
 }

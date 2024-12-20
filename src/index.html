@@ -1,15 +1,55 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.6.0/build/styles/github.min.css"
+    />
+    <link rel="stylesheet" href="./grimgrim.css" />
     <link rel="stylesheet" href="./style.css" />
-    <title>WebGL2 template</title>
+    <title>GRIMGRIM</title>
     <script src="main.ts" type="module" async defer></script>
+    <script src="content.ts" type="module" async defer></script>
   </head>
   <body>
-    <canvas id="screen" width="1280" height="720"></canvas>
+    <div class="wrapper">
+      <h1>GRIMGRIM</h1>
+      <h2>HTML and CSS Skeleton</h2>
+      <p>
+        DOM 요소(DOM element)를 초기화해줍니다. 왼쪽에 주(main) 화면을 구성하고
+        오른쪽에 사이드바(sidebar)를 배치하고 사이드바(sidebar) 안에는 현재
+        이미지(image) 내 레이어(layer) 목록을 볼수 있도록 구성합니다. 우선
+        HTML과 CSS를 이용하여 목업을 구성해보았습니다. 나중에는 해당 DOM
+        요소(DOM element)와 CSS 소스 코드(source code)를
+        타입스크립트(typescript)를 이용하여 커스텀 엘레먼트(custom element)로
+        생성하려고 합니다.
+      </p>
+      <div class="grimgrim">
+        <canvas class="grimgrim-screen" width="1280" height="720"></canvas>
+        <div class="grimgrim-sidebar">
+          <ul class="grimgrim-layer-list">
+            <li class="grimgrim-layer-list__item">
+              <canvas class="grimgrim-layer-list__thumbnail"></canvas>
+              <span class="grimgrim-layer-list__name">Layer 1</span>
+            </li>
+            <li
+              class="grimgrim-layer-list__item grimgrim-layer-list__item--active"
+            >
+              <canvas class="grimgrim-layer-list__thumbnail"></canvas>
+              <span class="grimgrim-layer-list__name">Layer 0</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <p>
+        아래 소스 코드(source code)는 위의 화면을 구성하기 위해 사용한 HTML과
+        CSS입니다.
+      </p>
+      <pre><code data-source-id="1"></code></pre>
+    </div>
   </body>
 </html>
