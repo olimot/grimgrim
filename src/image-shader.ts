@@ -1,52 +1,94 @@
 import { mat4, ReadonlyMat4 } from "gl-matrix";
 
-export interface TextureInfo {
+export interface TextureInfo<
+  T extends TexImageSource | ArrayBufferView<ArrayBufferLike> | null =
+    | TexImageSource
+    | ArrayBufferView<ArrayBufferLike>
+    | null,
+> {
   texture: WebGLTexture;
-  data: TexImageSource | ArrayBufferView<ArrayBufferLike> | null;
+  data: T;
   width: number;
   height: number;
 }
 
-export function createImageTexture(gl: WebGL2RenderingContext): TextureInfo {
+export type RGBA32FTextureInfo = TextureInfo<Float32Array>;
+export type RGBATextureInfo = TextureInfo<Uint8Array | Uint8ClampedArray>;
+
+export function createTexture(
+  gl: WebGL2RenderingContext,
+  width?: number,
+  height?: number,
+): TextureInfo {
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  if (width && height) {
+    const target = gl.TEXTURE_2D;
+    const internal = gl.RGBA;
+    const format = gl.RGBA;
+    const type = gl.UNSIGNED_BYTE;
+    gl.texImage2D(target, 0, internal, width, height, 0, format, type, null);
+  }
+
   return { texture, data: null, width: 1, height: 1 };
 }
 
-export interface F32TextureInfo extends TextureInfo {
-  texture: WebGLTexture;
-  data: Float32Array;
-  width: number;
-  height: number;
-  upload: () => void;
-}
-
-export function createF32Texture(
+export function createRGBADataTexture(
   gl: WebGL2RenderingContext,
   width: number,
   height: number,
-  data = new Float32Array(width * height * 4),
-): F32TextureInfo {
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  data: Uint8Array | Uint8ClampedArray,
+): TextureInfo {
+  const textureInfo = createTexture(gl);
+  Object.assign(textureInfo, { width, height, data });
 
-  const [w, h] = [width, height];
-  const upload = () => {
-    const target = gl.TEXTURE_2D;
-    gl.bindTexture(target, texture);
-    gl.texImage2D(target, 0, gl.RGBA32F, w, h, 0, gl.RGBA, gl.FLOAT, data);
-  };
-  upload();
+  const target = gl.TEXTURE_2D;
+  const internal = gl.RGBA;
+  const format = gl.RGBA;
+  const type = gl.UNSIGNED_BYTE;
+  gl.texImage2D(target, 0, internal, width, height, 0, format, type, data);
+  return textureInfo;
+}
 
-  return { texture, data, width, height, upload };
+export function createRGBA32FDataTexture(
+  gl: WebGL2RenderingContext,
+  width: number,
+  height: number,
+  data: Float32Array,
+): RGBA32FTextureInfo {
+  const textureInfo = createTexture(gl);
+  Object.assign(textureInfo, { width, height, data });
+
+  const target = gl.TEXTURE_2D;
+  const internal = gl.RGBA32F;
+  const format = gl.RGBA;
+  const type = gl.FLOAT;
+  gl.texImage2D(target, 0, internal, width, height, 0, format, type, data);
+
+  return textureInfo as RGBA32FTextureInfo;
+}
+
+export function createR32FDataTexture(
+  gl: WebGL2RenderingContext,
+  width: number,
+  height: number,
+  data: Float32Array,
+): RGBA32FTextureInfo {
+  const textureInfo = createTexture(gl);
+  Object.assign(textureInfo, { width, height, data });
+
+  const target = gl.TEXTURE_2D;
+  const internal = gl.R32F;
+  const format = gl.RED;
+  const type = gl.FLOAT;
+  gl.texImage2D(target, 0, internal, width, height, 0, format, type, data);
+
+  return textureInfo as RGBA32FTextureInfo;
 }
 
 export function createImageShaderProgram(gl: WebGL2RenderingContext) {
@@ -72,12 +114,13 @@ export function createImageShaderProgram(gl: WebGL2RenderingContext) {
     /* glsl */ `#version 300 es
     precision highp float;
     uniform sampler2D baseColorTexture;
-    uniform float opacity;
+    uniform sampler2D maskTexture;
+
     in vec2 texCoord;
     out vec4 finalColor;
     void main() {
       finalColor = texture(baseColorTexture, texCoord);
-      finalColor.a *= opacity;
+      finalColor.a *= texture(maskTexture, texCoord).r;
     }`,
   );
   gl.compileShader(vert);
@@ -99,7 +142,7 @@ export function createImageShaderProgram(gl: WebGL2RenderingContext) {
     view: gl.getUniformLocation(program, "view"),
     projection: gl.getUniformLocation(program, "projection"),
     baseColorTexture: gl.getUniformLocation(program, "baseColorTexture"),
-    opacity: gl.getUniformLocation(program, "opacity"),
+    maskTexture: gl.getUniformLocation(program, "maskTexture"),
   };
 
   const vertices = [0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0];
@@ -134,6 +177,7 @@ export function createImageShaderProgram(gl: WebGL2RenderingContext) {
     gl.enable(gl.BLEND);
     gl.uniformMatrix4fv(u.view, false, view);
     gl.uniform1i(u.baseColorTexture, 0);
+    gl.uniform1i(u.maskTexture, 1);
     gl.bindVertexArray(vao);
   };
 
@@ -156,17 +200,22 @@ export function createImageShaderProgram(gl: WebGL2RenderingContext) {
     gl.uniformMatrix4fv(u.projection, false, projection);
   };
 
+  const initialMask = createR32FDataTexture(gl, 1, 1, new Float32Array([1]));
+
   const draw = (
     src: TextureInfo,
+    mask = initialMask,
     model: ReadonlyMat4 | null | undefined = null,
-    opacity = 1,
   ) => {
-    gl.uniform1i(u.baseColorTexture, 0);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, src.texture);
+    if (src === mask) gl.bindTexture(gl.TEXTURE_2D, initialMask.texture);
+    else gl.bindTexture(gl.TEXTURE_2D, src.texture);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, mask.texture);
+
     if (!model) mat4.fromScaling(innerModel, [src.width, src.height, 1]);
     gl.uniformMatrix4fv(u.model, false, model ?? innerModel);
-    gl.uniform1f(u.opacity, opacity);
+
     gl.drawElements(gl.TRIANGLES, ids.length, gl.UNSIGNED_BYTE, 0);
   };
 

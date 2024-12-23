@@ -1,5 +1,9 @@
 import { mat4 } from "gl-matrix";
-import { createF32Texture, createImageShaderProgram } from "./image-shader";
+import { createBrushTexture } from "./brush-texture";
+import {
+  createImageShaderProgram,
+  createR32FDataTexture,
+} from "./image-shader";
 
 export function* bline(x0 = 0, y0 = 0, x1 = 0, y1 = 0) {
   const [sx, sy] = [x0 < x1 ? 1 : -1, y0 < y1 ? 1 : -1];
@@ -31,7 +35,7 @@ export function easeSine(x: number): number {
   return -(Math.cos(Math.PI * x) - 1) / 2;
 }
 
-window.addEventListener("load", () => {
+window.addEventListener("load", async () => {
   const canvas = document.querySelector(
     ".grimgrim-canvas",
   ) as HTMLCanvasElement;
@@ -48,58 +52,40 @@ window.addEventListener("load", () => {
   const gl = canvas.getContext("webgl2");
   if (!gl) return;
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
   gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
   gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-  gl.depthFunc(gl.LEQUAL);
   gl.blendFuncSeparate(
     gl.SRC_ALPHA,
     gl.ONE_MINUS_SRC_ALPHA,
     gl.ONE,
     gl.ONE_MINUS_SRC_ALPHA,
   );
-  gl.blendEquation(gl.FUNC_ADD);
-  gl.colorMask(true, true, true, true);
-  gl.clearColor(1, 0, 0, 1);
-  gl.clearDepth(1);
   gl.getExtension("EXT_color_buffer_float");
   gl.getExtension("EXT_float_blend");
 
-  const paintingTex = createF32Texture(gl, size[0], size[1]);
-  paintingTex.data.forEach((_, i) => {
-    paintingTex.data[i] = i % 4 === 3 ? 1 : 0;
-  });
-  paintingTex.upload();
+  const paintingData = new Float32Array(size[0] * size[1]).fill(0);
+  const paintingTex = createR32FDataTexture(gl, size[0], size[1], paintingData);
 
-  const brushSize = Math.ceil(32 * 1.6);
-  const brushCenter = (brushSize - 1) / 2;
-  const brushData = new Float32Array(brushSize * brushSize * 4);
-  brushData.fill(1);
-  for (let by = 0; by < brushSize; by++) {
-    for (let bx = 0; bx < brushSize; bx++) {
-      const dx = bx - brushCenter;
-      const dy = by - brushCenter;
-      let t = 1 - Math.sqrt(dx * dx + dy * dy) / brushCenter;
-      t = Math.min(Math.max(0, t), 1);
-      const idx = by * brushSize + bx;
-      brushData[idx * 4 + 0] = 1;
-      brushData[idx * 4 + 1] = 1;
-      brushData[idx * 4 + 2] = 1;
-      brushData[idx * 4 + 3] = toLinear(easeSine(t));
-    }
+  const brushDiameter = 32;
+  const brushTex = await createBrushTexture(gl, brushDiameter, 0);
+  const brushSpacing = brushDiameter / 4;
+  const brushModel = mat4.create();
+  function computeBrushModel(x = 0, y = 0) {
+    const xCenter = (brushTex.width - 1) / 2;
+    const yCenter = (brushTex.height - 1) / 2;
+    mat4.fromTranslation(brushModel, [x - xCenter, y - yCenter, 0]);
+    mat4.scale(brushModel, brushModel, [brushTex.width, brushTex.height, 1]);
+    return brushModel;
   }
-  const brushTex = createF32Texture(gl, brushSize, brushSize, brushData);
-  brushTex.upload();
 
-  const pogramInfo = createImageShaderProgram(gl);
-  pogramInfo.use();
-  pogramInfo.bindFramebuffer(null);
+  const imageShader = createImageShaderProgram(gl);
+  imageShader.use();
+  imageShader.bindFramebuffer(null);
   gl.clear(gl.COLOR_BUFFER_BIT);
-  pogramInfo.draw(paintingTex);
+  imageShader.draw(paintingTex, paintingTex, null);
 
   let [x0, y0] = [NaN, NaN];
   let brushPointerId = -1;
-  const brushModel = mat4.create();
 
   const brush = (event = new PointerEvent("")) => {
     if (event.target !== canvas) return;
@@ -112,43 +98,31 @@ window.addEventListener("load", () => {
     }
     if (brushPointerId !== event.pointerId) return;
     event.preventDefault();
-    pogramInfo.bindFramebuffer(paintingTex);
+    imageShader.bindFramebuffer(paintingTex);
 
     let x: number;
     let y: number;
     if (event.type === "pointerdown") {
       [x, y] = [x0, y0];
-      mat4.fromTranslation(brushModel, [x - brushCenter, y - brushCenter, 0]);
-      mat4.scale(brushModel, brushModel, [brushSize, brushSize, 1]);
-      pogramInfo.draw(brushTex, brushModel, 1);
+      imageShader.draw(brushTex, brushTex, computeBrushModel(x, y));
     } else {
       const dx = point[0] - x0;
       const dy = point[1] - y0;
       const distance = Math.hypot(dx, dy);
-      const minDistance = Math.pow(brushSize, 1 / 3);
-      const nDots = Math.floor(distance / minDistance);
+      const nDots = Math.floor(distance / brushSpacing);
       if (!nDots) return;
-      const dt = minDistance / distance;
+      const dt = brushSpacing / distance;
       [x, y] = [x0, y0];
       for (let i = 0; i < nDots; i++) {
         x += dx * dt;
         y += dy * dt;
-        mat4.fromTranslation(brushModel, [x - brushCenter, y - brushCenter, 0]);
-        mat4.scale(brushModel, brushModel, [brushSize, brushSize, 1]);
-        pogramInfo.draw(brushTex, brushModel, 1);
+        imageShader.draw(brushTex, brushTex, computeBrushModel(x, y));
       }
     }
 
-    pogramInfo.bindFramebuffer(null);
+    imageShader.bindFramebuffer(null);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.blendFuncSeparate(
-      gl.SRC_ALPHA,
-      gl.ONE_MINUS_SRC_ALPHA,
-      gl.ONE,
-      gl.ONE_MINUS_SRC_ALPHA,
-    );
-    gl.blendEquation(gl.FUNC_ADD);
-    pogramInfo.draw(paintingTex);
+    imageShader.draw(paintingTex, paintingTex);
 
     [x0, y0] = point;
   };
