@@ -1,8 +1,8 @@
 export function createGaussianKernel(sigma: number) {
-  if (!sigma) return new Float32Array();
+  if (!sigma) return new Float32Array([1]);
 
   sigma = Math.max(1, sigma);
-  const radius = Math.ceil(sigma * 2);
+  const radius = Math.ceil(3 * sigma);
   const diameter = 2 * radius + 1;
   const kernel = new Float32Array(diameter * diameter);
 

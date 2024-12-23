@@ -1,94 +1,67 @@
-import { vec3, vec4 } from "gl-matrix";
-import { createGaussianKernel } from "./gaussian-blur";
-import {
-  createR32FDataTexture,
-  createRGBA32FDataTexture,
-  createTexture,
-} from "./image-shader";
+import { createR32FDataTexture, createR8DataTexture } from "./image-shader";
 
-export async function createBrushTexture(
+export function computeBrushProps(diameter: number, hardness: number) {
+  const shrink = Math.sqrt(Math.PI) - 1;
+  const hardDiameter = diameter * (hardness + shrink * (1 - hardness));
+  let sigma = 0.175 * hardDiameter;
+  if (hardness < 1 && sigma < 1) sigma = 1;
+  const size = Math.ceil(hardDiameter * 2);
+  return { hardDiameter, size, sigma };
+}
+
+export function createBrushTextureByCPU(
   gl: WebGL2RenderingContext,
   diameter: number,
   hardness = 1,
 ) {
-  const radius = 0.5 * diameter;
-  let sigma = 0.5 * radius * (1 - hardness);
-  if (hardness < 1 && sigma < 1) sigma = 1;
+  const shrink = Math.sqrt(Math.PI) - 1;
+  const sigma = (1 - hardness) * 0.232 * diameter + hardness;
+  const size = Math.ceil(diameter * (hardness + shrink * (1 - hardness)) * 2);
+  const kernel = new Float32Array(size * size);
+  const hardRadius = 0.5 * hardness * diameter;
 
-  const size = Math.ceil(2 * diameter);
+  const sigmaSquare = sigma * sigma;
   const center = 0.5 * size;
-  const src = new Float32Array(size * size);
+  let max = 0;
   for (let y = 0; y < size; y++) {
     const yOffset = y * size;
     for (let x = 0; x < size; x++) {
-      const dx = x + 0.5 - center;
-      const dy = y + 0.5 - center;
-      const distance = Math.hypot(dx, dy);
-      const value = Math.min(Math.max(0, Math.max(1, radius) - distance), 1);
-      src[yOffset + x] = value;
+      const dx = center - x - 0.5;
+      const dy = center - y - 0.5;
+      let dSquare = dx * dx + dy * dy;
+      dSquare = Math.pow(Math.max(Math.sqrt(dSquare) - hardRadius, 0), 2);
+      const numerator = Math.pow(Math.E, -dSquare / (2 * sigmaSquare));
+      const value = numerator / (2 * Math.PI * sigmaSquare);
+      kernel[yOffset + x] = value;
+      max = Math.max(max, value);
     }
   }
-
-  if (hardness === 1) return createRGBA32FDataTexture(gl, size, size, src);
-
-  const gaussianKernel = createGaussianKernel(sigma);
-  const kernelSize = Math.sqrt(gaussianKernel.length);
-  const kernelCenter = kernelSize / 2;
-  const dst = new Float32Array(src);
-  for (let y = 0; y < size; y++) {
-    const yOffset = y * size;
-    for (let x = 0; x < size; x++) {
-      let value = 0;
-      for (let i = 0; i < gaussianKernel.length; i++) {
-        const kernelY = Math.floor(i / kernelSize);
-        const kernelX = i % kernelSize;
-        const kernelValue = gaussianKernel[i];
-        const srcY = Math.floor(y + kernelY - kernelCenter);
-        const srcX = Math.floor(x + kernelX - kernelCenter);
-        if (srcX < 0 || srcX >= size - 1 || srcY < 0 || srcY >= size - 1) {
-          continue;
-        }
-        value += src[srcY * size + srcX] * kernelValue;
-      }
-      dst[yOffset + x] = value;
-    }
-    await new Promise((r) => setTimeout(r));
-    if ((((y - 1) / 10) | 0) !== ((y / 10) | 0)) {
-      console.log(`${Math.round((y / size) * 10000) / 100}% done.`);
-    }
-  }
-
-  return createR32FDataTexture(gl, size, size, dst);
+  for (let i = 0; i < kernel.length; i++) kernel[i] /= max;
+  return createR32FDataTexture(gl, size, size, kernel);
 }
-
-const u8 = (float: number) => (float * 256) | 0;
 
 export function createBrushTextureByCanvas(
   gl: WebGL2RenderingContext,
   diameter: number,
   hardness = 1,
-  color: vec3 | vec4 = [0, 0, 0],
 ) {
-  const radius = 0.5 * diameter;
-  const softnessScale = 1 - hardness;
-  const sigma = Math.max(1, radius * softnessScale);
-  let size;
-  if (hardness < 1) size = Math.ceil(2 * diameter);
-  else size = Math.ceil(diameter);
-  const center = size / 2;
+  const { hardDiameter, sigma, size } = computeBrushProps(diameter, hardness);
 
   const canvas = document.createElement("canvas");
   Object.assign(canvas, { width: size, height: size });
   const context = canvas.getContext("2d")!;
   context.filter = `blur(${sigma}px)`;
-  context.beginPath();
-  context.arc(center, center, radius, 0, 2 * Math.PI);
-  context.fillStyle = `rgb(${u8(color[0])},${u8(color[1])},${u8(color[2])})`;
+  const center = size / 2;
+  context.arc(center, center, 0.5 * hardDiameter, 0, 2 * Math.PI);
   context.fill();
 
-  const textureInfo = createTexture(gl);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
-  Object.assign(textureInfo, { width: size, height: size, data: canvas });
+  const imageData = context.getImageData(0, 0, size, size);
+  const dst = new Uint8ClampedArray(size * size);
+  for (let i = 0; i < dst.length; i++) {
+    dst[i] = imageData.data[i * 4 + 3];
+  }
 
-  return textureInfo;
+  return createR8DataTexture(gl, size, size, dst);
 }
+
+export const createBrushTexture = createBrushTextureByCPU;

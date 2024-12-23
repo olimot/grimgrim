@@ -15,6 +15,39 @@ export interface TextureInfo<
 export type RGBA32FTextureInfo = TextureInfo<Float32Array>;
 export type RGBATextureInfo = TextureInfo<Uint8Array | Uint8ClampedArray>;
 
+export function createCheckerBoardTexture(
+  gl: WebGL2RenderingContext,
+): TextureInfo {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  const width = 16;
+  const height = 16;
+  const src = new ImageData(16, 16);
+  const white = [255, 255, 255, 255];
+  const gray = [203, 203, 203, 255];
+  for (let y = 0; y < src.height; y++) {
+    const yOffset = y * src.width;
+    const yColorFlag = y < 8 ? 0 : 1;
+    for (let x = 0; x < src.width; x++) {
+      const pixelOffset = (yOffset + x) * 4;
+      const xColorFlag = x < 8 ? 0 : 1;
+      const colorFlag = xColorFlag + yColorFlag;
+      src.data.set(colorFlag % 2 ? gray : white, pixelOffset);
+    }
+  }
+  const target = gl.TEXTURE_2D;
+  const internal = gl.RGBA;
+  const format = gl.RGBA;
+  const type = gl.UNSIGNED_BYTE;
+  gl.texImage2D(target, 0, internal, width, height, 0, format, type, src);
+
+  return { texture, data: src.data, width, height };
+}
+
 export function createTexture(
   gl: WebGL2RenderingContext,
   width?: number,
@@ -86,6 +119,26 @@ export function createR32FDataTexture(
   const internal = gl.R32F;
   const format = gl.RED;
   const type = gl.FLOAT;
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(target, 0, internal, width, height, 0, format, type, data);
+
+  return textureInfo as RGBA32FTextureInfo;
+}
+
+export function createR8DataTexture(
+  gl: WebGL2RenderingContext,
+  width: number,
+  height: number,
+  data: Uint8Array | Uint8ClampedArray,
+): RGBA32FTextureInfo {
+  const textureInfo = createTexture(gl);
+  Object.assign(textureInfo, { width, height, data });
+
+  const target = gl.TEXTURE_2D;
+  const internal = gl.R8;
+  const format = gl.RED;
+  const type = gl.UNSIGNED_BYTE;
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.texImage2D(target, 0, internal, width, height, 0, format, type, data);
 
   return textureInfo as RGBA32FTextureInfo;
@@ -205,7 +258,11 @@ export function createImageShaderProgram(gl: WebGL2RenderingContext) {
   const draw = (
     src: TextureInfo,
     mask = initialMask,
-    model: ReadonlyMat4 | null | undefined = null,
+    model: ReadonlyMat4 = mat4.fromScaling(innerModel, [
+      src.width,
+      src.height,
+      1,
+    ]),
   ) => {
     gl.activeTexture(gl.TEXTURE0);
     if (src === mask) gl.bindTexture(gl.TEXTURE_2D, initialMask.texture);
@@ -213,8 +270,7 @@ export function createImageShaderProgram(gl: WebGL2RenderingContext) {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_2D, mask.texture);
 
-    if (!model) mat4.fromScaling(innerModel, [src.width, src.height, 1]);
-    gl.uniformMatrix4fv(u.model, false, model ?? innerModel);
+    gl.uniformMatrix4fv(u.model, false, model);
 
     gl.drawElements(gl.TRIANGLES, ids.length, gl.UNSIGNED_BYTE, 0);
   };

@@ -1,9 +1,6 @@
 import { mat4 } from "gl-matrix";
 import { createBrushTexture } from "./brush-texture";
-import {
-  createImageShaderProgram,
-  createR32FDataTexture,
-} from "./image-shader";
+import { createImageShaderProgram, createR8DataTexture } from "./image-shader";
 
 export function* bline(x0 = 0, y0 = 0, x1 = 0, y1 = 0) {
   const [sx, sy] = [x0 < x1 ? 1 : -1, y0 < y1 ? 1 : -1];
@@ -37,7 +34,7 @@ export function easeSine(x: number): number {
 
 window.addEventListener("load", async () => {
   const canvas = document.querySelector(
-    ".grimgrim-canvas",
+    "#grimgrim1 .grimgrim-canvas",
   ) as HTMLCanvasElement;
   canvas.style.width = `${canvas.width / devicePixelRatio}px`;
   canvas.style.height = `${canvas.height / devicePixelRatio}px`;
@@ -51,9 +48,6 @@ window.addEventListener("load", async () => {
 
   const gl = canvas.getContext("webgl2");
   if (!gl) return;
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-  gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE);
-  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
   gl.blendFuncSeparate(
     gl.SRC_ALPHA,
     gl.ONE_MINUS_SRC_ALPHA,
@@ -63,11 +57,11 @@ window.addEventListener("load", async () => {
   gl.getExtension("EXT_color_buffer_float");
   gl.getExtension("EXT_float_blend");
 
-  const paintingData = new Float32Array(size[0] * size[1]).fill(0);
-  const paintingTex = createR32FDataTexture(gl, size[0], size[1], paintingData);
+  const paintingData = new Uint8Array(size[0] * size[1]).fill(0);
+  const paintingTex = createR8DataTexture(gl, size[0], size[1], paintingData);
 
   const brushDiameter = 32;
-  const brushTex = await createBrushTexture(gl, brushDiameter, 0);
+  const brushTex = createBrushTexture(gl, brushDiameter, 0);
   const brushSpacing = brushDiameter / 4;
   const brushModel = mat4.create();
   function computeBrushModel(x = 0, y = 0) {
@@ -82,7 +76,7 @@ window.addEventListener("load", async () => {
   imageShader.use();
   imageShader.bindFramebuffer(null);
   gl.clear(gl.COLOR_BUFFER_BIT);
-  imageShader.draw(paintingTex, paintingTex, null);
+  imageShader.draw(paintingTex);
 
   let [x0, y0] = [NaN, NaN];
   let brushPointerId = -1;
@@ -98,21 +92,21 @@ window.addEventListener("load", async () => {
     }
     if (brushPointerId !== event.pointerId) return;
     event.preventDefault();
-    imageShader.bindFramebuffer(paintingTex);
 
     let x: number;
     let y: number;
     if (event.type === "pointerdown") {
-      [x, y] = [x0, y0];
+      [x, y] = point;
+      imageShader.bindFramebuffer(paintingTex);
       imageShader.draw(brushTex, brushTex, computeBrushModel(x, y));
     } else {
-      const dx = point[0] - x0;
-      const dy = point[1] - y0;
+      const [dx, dy] = [point[0] - x0, point[1] - y0];
       const distance = Math.hypot(dx, dy);
       const nDots = Math.floor(distance / brushSpacing);
       if (!nDots) return;
       const dt = brushSpacing / distance;
       [x, y] = [x0, y0];
+      imageShader.bindFramebuffer(paintingTex);
       for (let i = 0; i < nDots; i++) {
         x += dx * dt;
         y += dy * dt;
@@ -122,9 +116,9 @@ window.addEventListener("load", async () => {
 
     imageShader.bindFramebuffer(null);
     gl.clear(gl.COLOR_BUFFER_BIT);
-    imageShader.draw(paintingTex, paintingTex);
+    imageShader.draw(paintingTex);
 
-    [x0, y0] = point;
+    [x0, y0] = [x, y];
   };
   window.addEventListener("pointerdown", brush);
   window.addEventListener("pointermove", brush);
