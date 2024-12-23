@@ -71,33 +71,24 @@ window.addEventListener("load", () => {
   });
   paintingTex.upload();
 
-  const hardness = 0;
-  const brushSize = 32;
-  const softBrushSize = Math.ceil(
-    brushSize * (hardness + 1.6 * (1 - hardness)),
-  );
-  const softBrushCenter = (softBrushSize - 1) / 2;
-  const brushData = new Float32Array(softBrushSize * softBrushSize * 4);
+  const brushSize = Math.ceil(32 * 1.6);
+  const brushCenter = (brushSize - 1) / 2;
+  const brushData = new Float32Array(brushSize * brushSize * 4);
   brushData.fill(1);
-  for (let by = 0; by < softBrushSize; by++) {
-    for (let bx = 0; bx < softBrushSize; bx++) {
-      const dx = bx - softBrushCenter;
-      const dy = by - softBrushCenter;
-      let t = 1 - Math.sqrt(dx * dx + dy * dy) / softBrushCenter;
+  for (let by = 0; by < brushSize; by++) {
+    for (let bx = 0; bx < brushSize; bx++) {
+      const dx = bx - brushCenter;
+      const dy = by - brushCenter;
+      let t = 1 - Math.sqrt(dx * dx + dy * dy) / brushCenter;
       t = Math.min(Math.max(0, t), 1);
-      const idx = by * softBrushSize + bx;
+      const idx = by * brushSize + bx;
       brushData[idx * 4 + 0] = 1;
       brushData[idx * 4 + 1] = 1;
       brushData[idx * 4 + 2] = 1;
       brushData[idx * 4 + 3] = toLinear(easeSine(t));
     }
   }
-  const brushTex = createF32Texture(
-    gl,
-    softBrushSize,
-    softBrushSize,
-    brushData,
-  );
+  const brushTex = createF32Texture(gl, brushSize, brushSize, brushData);
   brushTex.upload();
 
   const pogramInfo = createImageShaderProgram(gl);
@@ -109,6 +100,7 @@ window.addEventListener("load", () => {
   let [x0, y0] = [NaN, NaN];
   let brushPointerId = -1;
   const brushModel = mat4.create();
+
   const brush = (event = new PointerEvent("")) => {
     if (event.target !== canvas) return;
     const offset = [event.offsetX, event.offsetY];
@@ -121,24 +113,31 @@ window.addEventListener("load", () => {
     if (brushPointerId !== event.pointerId) return;
     event.preventDefault();
     pogramInfo.bindFramebuffer(paintingTex);
+
+    let x: number;
+    let y: number;
     if (event.type === "pointerdown") {
-      mat4.fromTranslation(brushModel, [
-        x0 - softBrushCenter,
-        y0 - softBrushCenter,
-        0,
-      ]);
+      [x, y] = [x0, y0];
+      mat4.fromTranslation(brushModel, [x - brushCenter, y - brushCenter, 0]);
+      mat4.scale(brushModel, brushModel, [brushSize, brushSize, 1]);
+      pogramInfo.draw(brushTex, brushModel, 1);
     } else {
-      const [x1, y1] = point;
-      const distance = Math.hypot(x1 - x0, y1 - y0);
-      if (distance < brushSize / 4) return;
-      mat4.fromTranslation(brushModel, [
-        x1 - softBrushCenter,
-        y1 - softBrushCenter,
-        0,
-      ]);
+      const dx = point[0] - x0;
+      const dy = point[1] - y0;
+      const distance = Math.hypot(dx, dy);
+      const minDistance = Math.pow(brushSize, 1 / 3);
+      const nDots = Math.floor(distance / minDistance);
+      if (!nDots) return;
+      const dt = minDistance / distance;
+      [x, y] = [x0, y0];
+      for (let i = 0; i < nDots; i++) {
+        x += dx * dt;
+        y += dy * dt;
+        mat4.fromTranslation(brushModel, [x - brushCenter, y - brushCenter, 0]);
+        mat4.scale(brushModel, brushModel, [brushSize, brushSize, 1]);
+        pogramInfo.draw(brushTex, brushModel, 1);
+      }
     }
-    mat4.scale(brushModel, brushModel, [softBrushSize, softBrushSize, 1]);
-    pogramInfo.draw(brushTex, brushModel, 1);
 
     pogramInfo.bindFramebuffer(null);
     gl.clear(gl.COLOR_BUFFER_BIT);
