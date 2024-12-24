@@ -15,10 +15,10 @@ void main() {
     pixelPosition = topLeft + vec2(0, size.y);
   } else if(gl_VertexID == 2 || gl_VertexID == 3) {
     texCoord = vec2(1, 0);
-    pixelPosition = bottomRight + size;
+    pixelPosition = topLeft + size;
   } else if(gl_VertexID == 4) {
     texCoord = vec2(1, 1);
-    pixelPosition = topRight + vec2(size.x, 0);
+    pixelPosition = topLeft + vec2(size.x, 0);
   }
 
   vec2 position = (2.0f * pixelPosition - 1.0f) * vec2(1, -1) / viewport;
