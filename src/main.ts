@@ -2,40 +2,14 @@ import { mat4 } from "gl-matrix";
 import { createBrushTexture } from "./brush-texture";
 import { createImageShaderProgram, createR8DataTexture } from "./image-shader";
 
-export function* bline(x0 = 0, y0 = 0, x1 = 0, y1 = 0) {
-  const [sx, sy] = [x0 < x1 ? 1 : -1, y0 < y1 ? 1 : -1];
-  const [dx, dy] = [Math.abs(x1 - x0), Math.abs(y1 - y0)];
-  const p = [x0, y0];
-  let err = (dx > dy ? dx : -dy) / 2;
-  while (true) {
-    yield p;
-    if (p[0] === x1 && p[1] === y1) break;
-    const e2 = err;
-    if (e2 > -dx) [err, p[0]] = [err - dy, p[0] + sx];
-    if (e2 < dy) [err, p[1]] = [err + dx, p[1] + sy];
-  }
-}
-
-export function toSRGB(x: number) {
-  return x <= 0.0031308 ? x * 12.92 : 1.055 * Math.pow(x, 1.0 / 2.4) - 0.055;
-}
-
-export function toLinear(x: number) {
-  return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4);
-}
-
-export function easePower(x: number, y = 2) {
-  return x < 0.5 ? Math.pow(2 * x, y) / 2 : 1 - Math.pow(-2 * x + 2, y) / 2;
-}
-
-export function easeSine(x: number): number {
-  return -(Math.cos(Math.PI * x) - 1) / 2;
+function assert(condition: boolean, ...args: unknown[]): asserts condition {
+  console.assert(condition, ...args);
+  if (!condition) throw new Error("Assertion failed.");
 }
 
 window.addEventListener("load", async () => {
-  const canvas = document.querySelector(
-    "#grimgrim1 .grimgrim-canvas",
-  ) as HTMLCanvasElement;
+  const canvas = document.querySelector("#grimgrim1 .grimgrim-canvas");
+  assert(canvas instanceof HTMLCanvasElement);
   canvas.style.width = `${canvas.width / devicePixelRatio}px`;
   canvas.style.height = `${canvas.height / devicePixelRatio}px`;
   let canvasLeft = canvas.parentElement!.clientWidth / 2;
@@ -47,7 +21,7 @@ window.addEventListener("load", async () => {
   const scale = [size[0] / canvas.clientWidth, size[1] / canvas.clientHeight];
 
   const gl = canvas.getContext("webgl2");
-  if (!gl) return;
+  assert(gl instanceof WebGL2RenderingContext);
   gl.blendFuncSeparate(
     gl.SRC_ALPHA,
     gl.ONE_MINUS_SRC_ALPHA,
@@ -60,7 +34,7 @@ window.addEventListener("load", async () => {
   const paintingData = new Uint8Array(size[0] * size[1]).fill(0);
   const paintingTex = createR8DataTexture(gl, size[0], size[1], paintingData);
 
-  const brushDiameter = 32;
+  const brushDiameter = 8;
   const brushTex = createBrushTexture(gl, brushDiameter, 0);
   const brushSpacing = brushDiameter / 4;
   const brushModel = mat4.create();

@@ -56,8 +56,6 @@ export function processConvolutionKernel(
   const program = gl.createProgram() as WebGLProgram;
   gl.attachShader(program, vert);
   gl.attachShader(program, frag);
-  gl.bindAttribLocation(program, 0, "POSITION");
-  gl.bindAttribLocation(program, 1, "TEXCOORD_0");
   gl.linkProgram(program);
 
   let log: string | null;
