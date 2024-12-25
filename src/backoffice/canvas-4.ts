@@ -5,11 +5,11 @@ import {
   getPointerInfo,
   normalizeCanvasSize,
 } from "../util";
-import fullVert from "./shader/full.vert?raw";
-import selectionFrag from "./shader/selection.frag?raw";
-import checkerboardFrag from "./shader/checkerboard.frag?raw";
-import simpleFrag from "./shader/simple.frag?raw";
-import rectangleVert from "./shader/rectangle.vert?raw";
+import fullVert from "../shader/full.vert?raw";
+import selectionFrag from "../shader/selection.frag?raw";
+import checkerboardFrag from "../shader/checkerboard.frag?raw";
+import simpleFrag from "../shader/simple.frag?raw";
+import rectangleVert from "../shader/rectangle.vert?raw";
 import { vec2 } from "gl-matrix";
 
 export default function canvas4() {

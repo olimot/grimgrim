@@ -1,8 +1,8 @@
 import { createPrograms } from "../gl/program";
 import { assert, normalizeCanvasSize } from "../util";
-import fullVert from "./shader/full.vert?raw";
-import simpleFrag from "./shader/simple.frag?raw";
-import checkerboardFrag from "./shader/checkerboard.frag?raw";
+import fullVert from "../shader/full.vert?raw";
+import simpleFrag from "../shader/simple.frag?raw";
+import checkerboardFrag from "../shader/checkerboard.frag?raw";
 
 export default function canvas1() {
   const canvas = document.getElementById("canvas-1");
