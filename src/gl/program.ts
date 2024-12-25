@@ -11,27 +11,27 @@ export function createPrograms(
 ) {
   const processings: {
     builder: GLProgramBuilder;
-    vertexShader: WebGLShader | null;
-    fragmentShader: WebGLShader | null;
-    program: WebGLProgram | null;
+    vertexShader: WebGLShader;
+    fragmentShader: WebGLShader;
+    program: WebGLProgram;
     error?: Error | undefined;
   }[] = [];
 
   for (const builder of builders) {
-    const vertexShader = null;
-    const fragmentShader = null;
-    const program = null;
+    const vertexShader = null!;
+    const fragmentShader = null!;
+    const program = null!;
     processings.push({ builder, vertexShader, fragmentShader, program });
   }
 
   for (const processing of processings) {
     if (processing.error) continue;
-    processing.vertexShader = gl.createShader(gl.VERTEX_SHADER);
+    processing.vertexShader = gl.createShader(gl.VERTEX_SHADER)!;
     if (!processing.vertexShader) {
       processing.error = new Error(`Couldn't create vertex shader`);
       continue;
     }
-    processing.fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+    processing.fragmentShader = gl.createShader(gl.FRAGMENT_SHADER)!;
     if (!processing.fragmentShader) {
       processing.error = new Error(`Couldn't create fragment shader`);
     }
@@ -72,8 +72,8 @@ export function createPrograms(
 
     if (!gl.getProgramParameter(processing.program, gl.LINK_STATUS)) {
       console.error(`Link failed: ${gl.getProgramInfoLog(program)}`);
-      console.log(`Vertex Shader: ${gl.getShaderInfoLog(vertexShader!)}`);
-      console.log(`Fragment Shader: ${gl.getShaderInfoLog(fragmentShader!)}`);
+      console.log(`Vertex Shader:\n${gl.getShaderInfoLog(vertexShader!)}`);
+      console.log(`Fragment Shader:\n${gl.getShaderInfoLog(fragmentShader!)}`);
       console.error(`an error occured during building ${name}`);
       processing.error = new Error("Couldn't link program.");
     }
