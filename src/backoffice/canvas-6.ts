@@ -4,7 +4,7 @@ import {
   capturePointer,
   getPointerInfo,
   normalizeCanvasSize,
-} from "../util";
+} from "./util";
 import fullVert from "../shader/full.vert?raw";
 import simpleFrag from "../shader/simple.frag?raw";
 import checkerboardFrag from "../shader/checkerboard.frag?raw";
@@ -78,26 +78,26 @@ export default function canvas6() {
 
   // Setup checkerboard program
   const checkerboard = programs[0];
-  gl.useProgram(checkerboard.program);
-  const uViewport = gl.getUniformLocation(checkerboard.program, "viewport");
+  gl.useProgram(checkerboard);
+  const uViewport = gl.getUniformLocation(checkerboard, "viewport");
   gl.uniform2fv(uViewport, viewport);
 
   // Setup painting layer program
   const simple = programs[1];
-  gl.useProgram(simple.program);
-  gl.uniform1i(gl.getUniformLocation(simple.program, "srcTexture"), 0);
+  gl.useProgram(simple);
+  gl.uniform1i(gl.getUniformLocation(simple, "srcTexture"), 0);
 
   // Setup brush program
   const brush = programs[2];
-  gl.useProgram(brush.program);
-  gl.uniform1i(gl.getUniformLocation(brush.program, "srcTexture"), 0);
+  gl.useProgram(brush);
+  gl.uniform1i(gl.getUniformLocation(brush, "srcTexture"), 0);
 
   // Draw checkerboard
-  gl.useProgram(checkerboard.program);
+  gl.useProgram(checkerboard);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   // Draw painting layer
-  gl.useProgram(simple.program);
+  gl.useProgram(simple);
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, layer1tex);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -120,9 +120,9 @@ export default function canvas6() {
       document.getElementById("brush-hardness-6") as HTMLInputElement
     ).value;
     const h = Number(brushHardnessText) / 100;
-    gl.useProgram(brush.program);
-    gl.uniform3fv(gl.getUniformLocation(brush.program, "color"), color);
-    gl.uniform1f(gl.getUniformLocation(brush.program, "hardness"), h);
+    gl.useProgram(brush);
+    gl.uniform3fv(gl.getUniformLocation(brush, "color"), color);
+    gl.uniform1f(gl.getUniformLocation(brush, "hardness"), h);
     gl.viewport(x - s, gl.drawingBufferHeight - y - s, s * 2, s * 2);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   };
@@ -165,7 +165,7 @@ export default function canvas6() {
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.useProgram(simple.program);
+    gl.useProgram(simple);
     gl.bindTexture(gl.TEXTURE_2D, layer1tex);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 

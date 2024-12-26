@@ -1,5 +1,5 @@
 import { createPrograms } from "../gl/program";
-import { assert, normalizeCanvasSize } from "../util";
+import { assert, normalizeCanvasSize } from "./util";
 import fullVert from "../shader/full.vert?raw";
 import simpleFrag from "../shader/simple.frag?raw";
 import checkerboardFrag from "../shader/checkerboard.frag?raw";
@@ -37,9 +37,9 @@ export default function canvas1() {
 
   // Draw checkerboard
   const checkerboard = programs[0];
-  gl.useProgram(checkerboard.program);
+  gl.useProgram(checkerboard);
   gl.uniform2fv(
-    gl.getUniformLocation(checkerboard.program, "viewport"),
+    gl.getUniformLocation(checkerboard, "viewport"),
     viewport,
   );
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -90,11 +90,11 @@ export default function canvas1() {
 
   // Draw layers
   const simple = programs[1];
-  gl.useProgram(simple.program);
+  gl.useProgram(simple);
 
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, layer1tex);
-  gl.uniform1i(gl.getUniformLocation(simple.program, "srcTexture"), 0);
+  gl.uniform1i(gl.getUniformLocation(simple, "srcTexture"), 0);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   gl.bindTexture(gl.TEXTURE_2D, layer2tex);

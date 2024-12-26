@@ -4,7 +4,7 @@ import {
   capturePointer,
   getPointerInfo,
   normalizeCanvasSize,
-} from "../util";
+} from "./util";
 import fullVert from "../shader/full.vert?raw";
 import simpleFrag from "../shader/simple.frag?raw";
 import checkerboardFrag from "../shader/checkerboard.frag?raw";
@@ -140,26 +140,26 @@ export default function canvas2() {
 
   // Setup checkerboard program
   const checkerboard = programs[0];
-  gl.useProgram(checkerboard.program);
-  const uViewport = gl.getUniformLocation(checkerboard.program, "viewport");
+  gl.useProgram(checkerboard);
+  const uViewport = gl.getUniformLocation(checkerboard, "viewport");
   gl.uniform2fv(uViewport, viewport);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   // Setup layer program
   const rectangle = programs[1];
-  gl.useProgram(rectangle.program);
-  gl.uniform2fv(gl.getUniformLocation(rectangle.program, "viewport"), viewport);
-  gl.uniform2fv(gl.getUniformLocation(rectangle.program, "srcSize"), viewport);
-  gl.uniform1i(gl.getUniformLocation(rectangle.program, "srcTexture"), 0);
-  const uTopLeftLoc = gl.getUniformLocation(rectangle.program, "topLeft");
+  gl.useProgram(rectangle);
+  gl.uniform2fv(gl.getUniformLocation(rectangle, "viewport"), viewport);
+  gl.uniform2fv(gl.getUniformLocation(rectangle, "srcSize"), viewport);
+  gl.uniform1i(gl.getUniformLocation(rectangle, "srcTexture"), 0);
+  const uTopLeftLoc = gl.getUniformLocation(rectangle, "topLeft");
 
   const draw = () => {
     // Draw checkerboard
-    gl.useProgram(checkerboard.program);
+    gl.useProgram(checkerboard);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // Draw layers
-    gl.useProgram(rectangle.program);
+    gl.useProgram(rectangle);
     for (const layer of layers) {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, layer.texture);

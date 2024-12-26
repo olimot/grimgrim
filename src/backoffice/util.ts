@@ -51,18 +51,18 @@ export function normalizeCanvasSize(canvas: HTMLCanvasElement) {
   canvas.style.height = `${canvas.height / devicePixelRatio}px`;
 }
 
-export function getCanvasPointerInfo(
-  canvas: HTMLCanvasElement,
-  event: PointerEvent,
-): readonly [vec2, vec2, vec2] {
-  const { left, top, width, height } = canvas.getBoundingClientRect();
-  const scale = vec2.fromValues(canvas.width / width, canvas.height / height);
-  const offset = vec2.fromValues(event.clientX - left, event.clientY - top);
-  const p1 = vec2.mul(offset, offset, scale);
-  const delta = vec2.fromValues(event.movementX, event.movementY);
-  if (!vec2.len(delta)) return [p1, p1, delta];
-  const p0 = vec2.sub(vec2.create(), p1, vec2.mul(delta, delta, scale));
-  return [p0, p1, delta];
+export function getPointerInfo(event: PointerEvent): [vec2, vec2, vec2] {
+  const scale = [1, 1];
+  if (event.target instanceof HTMLCanvasElement) {
+    scale[0] = event.target.width / event.target.clientWidth;
+    scale[1] = event.target.height / event.target.clientHeight;
+  }
+
+  const p1: vec2 = [scale[0] * event.offsetX, scale[1] * event.offsetY];
+  if (event.type === "pointerdown") return [p1, p1, [0, 0]] as const;
+
+  const dp: vec2 = [scale[0] * event.movementX, scale[1] * event.movementY];
+  return [vec2.sub([0, 0], p1, dp), p1, dp] as const;
 }
 
 export function capturePointer(

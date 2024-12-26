@@ -4,7 +4,7 @@ import {
   capturePointer,
   getPointerInfo,
   normalizeCanvasSize,
-} from "../util";
+} from "./util";
 import fullVert from "../shader/full.vert?raw";
 import selectionFrag from "../shader/selection.frag?raw";
 import checkerboardFrag from "../shader/checkerboard.frag?raw";
@@ -138,26 +138,26 @@ export default function canvas4() {
 
   // Setup checkerboard program
   const checkerboard = programs[0];
-  gl.useProgram(checkerboard.program);
-  const uViewport = gl.getUniformLocation(checkerboard.program, "viewport");
+  gl.useProgram(checkerboard);
+  const uViewport = gl.getUniformLocation(checkerboard, "viewport");
   gl.uniform2fv(uViewport, viewport);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
 
   // Setup layer program
   const rectangle = programs[1];
-  gl.useProgram(rectangle.program);
-  gl.uniform2fv(gl.getUniformLocation(rectangle.program, "viewport"), viewport);
-  gl.uniform2fv(gl.getUniformLocation(rectangle.program, "srcSize"), viewport);
-  gl.uniform1i(gl.getUniformLocation(rectangle.program, "srcTexture"), 0);
-  const uTopLeftLoc = gl.getUniformLocation(rectangle.program, "topLeft");
+  gl.useProgram(rectangle);
+  gl.uniform2fv(gl.getUniformLocation(rectangle, "viewport"), viewport);
+  gl.uniform2fv(gl.getUniformLocation(rectangle, "srcSize"), viewport);
+  gl.uniform1i(gl.getUniformLocation(rectangle, "srcTexture"), 0);
+  const uTopLeftLoc = gl.getUniformLocation(rectangle, "topLeft");
 
   // Setup selection program
   const selection = programs[2];
-  gl.useProgram(selection.program);
-  gl.uniform2fv(gl.getUniformLocation(selection.program, "viewport"), viewport);
-  gl.uniform2fv(gl.getUniformLocation(selection.program, "srcSize"), viewport);
-  gl.uniform1i(gl.getUniformLocation(selection.program, "srcTexture"), 0);
-  const uTime = gl.getUniformLocation(selection.program, "time");
+  gl.useProgram(selection);
+  gl.uniform2fv(gl.getUniformLocation(selection, "viewport"), viewport);
+  gl.uniform2fv(gl.getUniformLocation(selection, "srcSize"), viewport);
+  gl.uniform1i(gl.getUniformLocation(selection, "srcTexture"), 0);
+  const uTime = gl.getUniformLocation(selection, "time");
 
   capturePointer(canvas, (event) => {
     const p1 = getPointerInfo(event)[1];
@@ -207,11 +207,11 @@ export default function canvas4() {
   requestAnimationFrame(function callback(time) {
     requestAnimationFrame(callback);
     // Draw checkerboard
-    gl.useProgram(checkerboard.program);
+    gl.useProgram(checkerboard);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     // Draw layers
-    gl.useProgram(rectangle.program);
+    gl.useProgram(rectangle);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, layer1tex);
     gl.uniform2fv(uTopLeftLoc, [0, 0]);
@@ -224,7 +224,7 @@ export default function canvas4() {
       gl.ONE,
       gl.ONE_MINUS_SRC_ALPHA,
     );
-    gl.useProgram(rectangle.program);
+    gl.useProgram(rectangle);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, lineTex);
     gl.uniform2fv(uTopLeftLoc, [0, 0]);
@@ -237,7 +237,7 @@ export default function canvas4() {
     );
 
     // Draw a selection
-    gl.useProgram(selection.program);
+    gl.useProgram(selection);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, selectionTex);
     gl.uniform1f(uTime, time / 1000);

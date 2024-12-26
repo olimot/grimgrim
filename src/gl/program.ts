@@ -79,7 +79,7 @@ export function createPrograms(
     }
   }
 
-  return processings;
+  return processings.map((it) => it.program);
 }
 
 // export function createImageShaderProgram(gl: WebGL2RenderingContext) {
