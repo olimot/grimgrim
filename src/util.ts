@@ -90,6 +90,10 @@ export function capturePointer(
   window.addEventListener("pointerdown", capture);
   window.addEventListener("pointermove", capture);
   window.addEventListener("pointerup", release);
+  window.addEventListener(
+    "contextmenu",
+    (e) => !e.ctrlKey && e.preventDefault(),
+  );
 
   return () => {
     window.removeEventListener("pointerdown", capture);
