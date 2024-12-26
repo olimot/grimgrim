@@ -29,9 +29,12 @@ const imageBox = [0, 0, 512, 512];
 
 const gl = canvas.getContext("webgl2");
 assert(gl instanceof WebGL2RenderingContext);
+gl.clearColor(0.055, 0.055, 0.055, 1);
+
 const programs = createPrograms(gl, [Checkerboard]);
 const checkerboard = Checkerboard.setup(gl, programs[0]);
 const draw = () => {
+  gl.clear(gl.COLOR_BUFFER_BIT);
   gl.useProgram(checkerboard.program);
   gl.viewport(
     viewport[0] + (viewport[2] - imageBox[2]) / 2 + imageBox[0],
