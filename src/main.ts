@@ -1,6 +1,7 @@
+import { vec2 } from "gl-matrix";
 import Checkerboard from "./checkerboard";
 import { createPrograms } from "./gl/program";
-import { assert, getCanvasPointerInfo } from "./util";
+import { assert, capturePointer, getCanvasPointerInfo } from "./util";
 
 document.documentElement.style.height = "100%";
 document.body.style.margin = "0";
@@ -24,28 +25,58 @@ function getViewport(): Viewport {
   return [0, y, width, height];
 }
 
+const imageBox = [0, 0, 512, 512];
+
 const gl = canvas.getContext("webgl2");
 assert(gl instanceof WebGL2RenderingContext);
 const programs = createPrograms(gl, [Checkerboard]);
 const checkerboard = Checkerboard.setup(gl, programs[0]);
-const imageBox = [0, 0, 512, 512];
-let viewport = getViewport();
-new ResizeObserver(() => {
-  viewport = getViewport();
-
-  const imageViewport: Viewport = [
-    (viewport[2] - imageBox[2]) / 2 + imageBox[0],
+const draw = () => {
+  gl.useProgram(checkerboard.program);
+  gl.viewport(
+    viewport[0] + (viewport[2] - imageBox[2]) / 2 + imageBox[0],
     viewport[1] + (viewport[3] - imageBox[3]) / 2 - imageBox[1],
     imageBox[2],
     imageBox[3],
-  ];
-  gl.useProgram(checkerboard.program);
-  gl.viewport(...imageViewport);
+  );
   gl.uniform2fv(checkerboard.uniformLocation.viewportSize, imageBox.slice(2));
   checkerboard.draw();
+};
+
+let viewport = getViewport();
+new ResizeObserver(() => {
+  viewport = getViewport();
+  draw();
 }).observe(document.body);
 
-window.addEventListener("pointermove", (e) => {
-  const [p0, p1, dev] = getCanvasPointerInfo(canvas, e);
-  console.log([...p0], [...p1], [...dev]);
+let activeHandler = "";
+window.addEventListener("keydown", (e) => {
+  if (e.code.startsWith("Control") && activeHandler === "grab") {
+    activeHandler = "pinch";
+  } else if (e.code === "Space") {
+    activeHandler = e.ctrlKey ? "pinch" : "grab";
+  }
+});
+window.addEventListener("keyup", (e) => {
+  if (e.code.startsWith("Control") && activeHandler === "pinch") {
+    activeHandler = "grab";
+  } else if (e.code === "Space") {
+    activeHandler = "";
+  }
+});
+
+capturePointer(canvas, (e) => {
+  const dp = getCanvasPointerInfo(canvas, e)[2];
+  if (activeHandler === "grab") {
+    imageBox[0] += dp[0];
+    imageBox[1] += dp[1];
+    draw();
+  } else if (activeHandler === "pinch") {
+    const length = Math.sign(dp[0]) * vec2.len(dp);
+    imageBox[0] -= length / 4;
+    imageBox[1] -= length / 4;
+    imageBox[2] += length;
+    imageBox[3] += length;
+    draw();
+  }
 });

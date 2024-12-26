@@ -72,7 +72,6 @@ export function capturePointer(
   let activePointerId = -1;
 
   const capture = (event: PointerEvent) => {
-    if (event.target !== target) return;
     if (event.type === "pointerdown") activePointerId = event.pointerId;
     if (activePointerId !== event.pointerId) return;
     event.preventDefault();
