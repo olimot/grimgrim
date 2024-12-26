@@ -139,7 +139,7 @@ capturePointer(canvas, (e) => {
     updateModel();
     draw();
   } else if (activeHandler === "pinch") {
-    const delta = (Math.sign(dp[0] || dp[1]) * vec2.len(dp)) / devicePixelRatio;
+    const delta = (Math.sign(dp[0]) * vec2.len(dp)) / devicePixelRatio;
     const r = 1 + delta * 0.005;
     vec2.add(control.xy, control.xy, scaleOrigin);
     vec2.scale(control.xy, control.xy, r);
