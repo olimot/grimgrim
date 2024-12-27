@@ -1,4 +1,4 @@
-import { createPrograms } from "../gl/program";
+import { createPrograms } from "./program";
 import {
   assert,
   capturePointer,

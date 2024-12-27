@@ -1,33 +1,14 @@
-export interface GLProgramInfo {
-  gl: WebGL2RenderingContext;
-  program: WebGLProgram;
-  uniformLocation: Record<string, WebGLUniformLocation>;
-  mode: GLenum;
-  arrayCount: number;
-}
-
-export interface PartialGLProgramInfo {
-  program: WebGLProgram;
-  uniformLocation?: Record<string, WebGLUniformLocation>;
-  mode?: GLenum;
-  arrayCount?: number;
-}
-
 export interface GLProgramBuilder {
   name: string;
   vertexShaderSource: string;
   fragmentShaderSource: string;
   attribLocation?: Record<number, string>;
-  setup: (
-    gl: WebGL2RenderingContext,
-    program: WebGLProgram,
-  ) => PartialGLProgramInfo;
 }
 
 export function createPrograms(
   gl: WebGL2RenderingContext,
   builders: GLProgramBuilder[],
-): GLProgramInfo[] {
+) {
   const processings: {
     builder: GLProgramBuilder;
     vertexShader: WebGLShader;
@@ -98,16 +79,7 @@ export function createPrograms(
     }
   }
 
-  return processings.map((it) => {
-    const built = it.builder.setup(gl, it.program);
-    return {
-      gl,
-      program: built.program,
-      uniformLocation: { ...built.uniformLocation },
-      mode: built.mode ?? gl.TRIANGLES,
-      arrayCount: built.arrayCount ?? 0,
-    };
-  });
+  return processings.map((it) => it.program);
 }
 
 // export function createImageShaderProgram(gl: WebGL2RenderingContext) {

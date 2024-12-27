@@ -1,4 +1,4 @@
-import { createPrograms } from "../gl/program";
+import { createPrograms } from "./program";
 import { assert, normalizeCanvasSize } from "./util";
 import fullVert from "../shader/full.vert?raw";
 import simpleFrag from "../shader/simple.frag?raw";
