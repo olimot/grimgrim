@@ -17,91 +17,15 @@
   line-height: 1.5;
 }
 
+body {
+  background-color: #0e0e0e;
+}
+
 canvas {
   image-rendering: crisp-edges;
   image-rendering: pixelated;
 }
 
 .material-symbols-outlined {
-  font-size: 16px;
-}
-
-.hud-box {
-  position: absolute;
-  box-shadow: 0px 0px 0px 2px #0e0e0e;
-  outline: 1px solid #fff;
-  border: 1px solid #0e0e0e;
-  background-color: #0e0e0e;
-  color: #fff;
-  border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  font-size: 12px;
-  overflow: hidden;
-  opacity: 0.66667;
-  line-height: 1;
-}
-
-.hud-box:hover,
-.hud-box:focus {
-  opacity: 1;
-}
-
-.tool-box {
-  bottom: 1rem;
-  left: 1rem;
-}
-
-.layer-box {
-  width: 180px;
-  height: 180px;
-  bottom: 1rem;
-  right: 1rem;
-  overflow-y: scroll;
-}
-
-.tool-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  user-select: none;
-}
-
-.layer-item {
-  display: flex;
-  align-items: center;
-  height: 48px;
-  user-select: none;
-}
-
-.tool-item:hover,
-.layer-item:hover {
-  background-color: #444444;
-}
-
-.tool-item:has(input:checked),
-.layer-item.selected {
-  background-color: #7f7f7f;
-}
-
-.tool-item input {
-  display: none;
-  visibility: hidden;
-  width: 0;
-  height: 0;
-}
-
-.layer-image {
-  display: block;
-  width: 40px;
-  height: 40px;
-  margin: 4px;
-  background-color: #e5e5e5;
-}
-
-.layer-name {
-  margin: 0 4px;
+  font-size: inherit;
 }

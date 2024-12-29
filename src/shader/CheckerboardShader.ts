@@ -1,11 +1,9 @@
 import { mat3 } from "gl-matrix";
-import fragmentShaderSource from "./shader/checkerboard.frag?raw";
-import vertexShaderSource from "./shader/rectangle.vert?raw";
-import { GLProgramBuilder } from "./gl/program";
+import { GLProgramBuilder } from "../gl/program";
+import fragmentShaderSource from "./checkerboard.frag?raw";
+import vertexShaderSource from "./rectangle.vert?raw";
 
-const mat3id = mat3.identity(mat3.create());
-
-const Checkerboard: GLProgramBuilder = {
+const CheckerboardShader: GLProgramBuilder = {
   name: "Checkerboard Shader",
   vertexShaderSource,
   fragmentShaderSource,
@@ -14,12 +12,13 @@ const Checkerboard: GLProgramBuilder = {
     const uniformLocation = {
       srcSize: gl.getUniformLocation(program, "srcSize")!,
       checkerSize: gl.getUniformLocation(program, "checkerSize")!,
-      viewMatrix: gl.getUniformLocation(program, "viewMatrix")!,
+      transform: gl.getUniformLocation(program, "transform")!,
     };
     gl.uniform1f(uniformLocation.checkerSize, 8);
-    gl.uniformMatrix3fv(uniformLocation.viewMatrix, false, mat3id);
+    const transform = mat3.identity(mat3.create());
+    gl.uniformMatrix3fv(uniformLocation.transform, false, transform);
     return { program, uniformLocation, arrayCount: 6 };
   },
 };
 
-export default Checkerboard;
+export default CheckerboardShader;

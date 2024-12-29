@@ -1,9 +1,7 @@
-import fragmentShaderSource from "./shader/simple.frag?raw";
-import vertexShaderSource from "./shader/rectangle.vert?raw";
+import fragmentShaderSource from "./simple.frag?raw";
+import vertexShaderSource from "./rectangle.vert?raw";
 import { mat3 } from "gl-matrix";
-import { GLProgramBuilder } from "./gl/program";
-
-const mat3id = mat3.identity(mat3.create());
+import { GLProgramBuilder } from "../gl/program";
 
 const ImageShader: GLProgramBuilder = {
   name: "Image Shader",
@@ -13,9 +11,10 @@ const ImageShader: GLProgramBuilder = {
     gl.useProgram(program);
     const uniformLocation = {
       srcTexture: gl.getUniformLocation(program, "srcTexture")!,
-      viewMatrix: gl.getUniformLocation(program, "viewMatrix")!,
+      transform: gl.getUniformLocation(program, "transform")!,
     };
-    gl.uniformMatrix3fv(uniformLocation.viewMatrix, false, mat3id);
+    const transform = mat3.identity(mat3.create());
+    gl.uniformMatrix3fv(uniformLocation.transform, false, transform);
     return { program, uniformLocation, arrayCount: 6 };
   },
 };

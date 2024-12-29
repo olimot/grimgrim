@@ -1,4 +1,4 @@
-import { vec2 } from "gl-matrix";
+import { mat3, ReadonlyVec2, vec2 } from "gl-matrix";
 
 export const mix = (x: number, y: number, a: number) => x * (1 - a) + y * a;
 
@@ -35,6 +35,15 @@ export function* bline(x0 = 0, y0 = 0, x1 = 0, y1 = 0) {
   }
 }
 
+export function scaleFromOrigin(
+  out: vec2,
+  a: ReadonlyVec2,
+  b: number,
+  origin: ReadonlyVec2,
+) {
+  return vec2.add(out, vec2.scale(out, vec2.sub(out, a, origin), b), origin);
+}
+
 export function assert(
   condition: boolean,
   ...args: unknown[]
@@ -43,12 +52,14 @@ export function assert(
   if (!condition) throw new Error("Assertion failed.");
 }
 
+export const dpr = devicePixelRatio;
+
 export function normalizeCanvasSize(canvas: HTMLCanvasElement) {
   if (!canvas.hasAttribute("width")) {
     Object.assign(canvas, { width: 300, height: 150 });
   }
-  canvas.style.width = `${canvas.width / devicePixelRatio}px`;
-  canvas.style.height = `${canvas.height / devicePixelRatio}px`;
+  canvas.style.width = `${canvas.width / dpr}px`;
+  canvas.style.height = `${canvas.height / dpr}px`;
 }
 
 export function getCanvasPointerInfo(
@@ -65,40 +76,90 @@ export function getCanvasPointerInfo(
   return [p0, p1, delta];
 }
 
-export function capturePointer(
-  target: HTMLElement,
-  callback: (e: PointerEvent) => unknown,
+export function getClipboardImageBitmap(
+  e: ClipboardEvent,
+  options?: ImageBitmapOptions,
 ) {
-  let activePointerId = -1;
+  if (!e.clipboardData) return;
+  const { items } = e.clipboardData;
+  for (const item of items) {
+    if (!["image/png", "image/jpeg"].includes(item.type)) continue;
+    const file = item.getAsFile();
+    if (!file) continue;
+    return createImageBitmap(file, options);
+  }
+}
 
-  const capture = (event: PointerEvent) => {
-    if (event.type === "pointerdown") activePointerId = event.pointerId;
-    if (activePointerId !== event.pointerId) return;
-    event.preventDefault();
-    return callback(event);
-  };
+export type Transform = {
+  translation: [number, number];
+  rotation: number;
+  scale: number;
+  matrix: mat3;
+};
 
-  const release = (event: PointerEvent) => {
-    if (activePointerId === event.pointerId) {
-      activePointerId = -1;
-      callback(event);
-    }
-  };
+export function Transform(): Transform {
+  const matrix = mat3.identity(mat3.create());
+  return { translation: [0, 0], rotation: 0, scale: 1, matrix };
+}
 
-  const prevTouchAction = target.style.touchAction;
-  target.style.touchAction = "none";
-  window.addEventListener("pointerdown", capture);
-  window.addEventListener("pointermove", capture);
-  window.addEventListener("pointerup", release);
-  window.addEventListener(
-    "contextmenu",
-    (e) => !e.ctrlKey && e.preventDefault(),
-  );
+export function toCSSTransform(transform: Transform) {
+  const [xt, yt] = transform.translation;
+  return `translate(${xt / dpr}px, ${yt / dpr}px) scale(${transform.scale})`;
+}
 
-  return () => {
-    window.removeEventListener("pointerdown", capture);
-    window.removeEventListener("pointermove", capture);
-    window.removeEventListener("pointerup", release);
-    target.style.touchAction = prevTouchAction;
-  };
+export type Rect = {
+  xy: [number, number];
+  size: [number, number];
+};
+
+export function Rect(
+  xy: ReadonlyVec2 = [0, 0],
+  size: ReadonlyVec2 = [0, 0],
+): Rect {
+  return { xy: [xy[0], xy[1]], size: [size[0], size[1]] };
+}
+
+export function resetTransform(transform: Transform) {
+  vec2.zero(transform.translation);
+  transform.rotation = 0;
+  transform.scale = 1;
+  mat3.identity(transform.matrix);
+}
+
+export function drawImageMatrix(
+  out: mat3,
+  src: { xy: vec2; size: vec2 },
+  dst: { size: vec2 },
+) {
+  const { xy, size } = src;
+  mat3.fromScaling(out, [size[0] / dst.size[0], size[1] / dst.size[1]]);
+
+  const denom = vec2.clone(dst.size);
+  vec2.mul(denom, denom, [0.5, -0.5]);
+  const p = vec2.clone(size);
+  vec2.sub(p, p, dst.size);
+  vec2.scale(p, p, 0.5);
+  vec2.add(p, p, xy);
+  vec2.div(p, p, denom);
+  return mat3.mul(out, mat3.fromTranslation(mat3.create(), p), out);
+}
+
+export function hexColor(hex: string): [number, number, number] {
+  return [
+    parseInt(hex.slice(1, 3), 16) / 255,
+    parseInt(hex.slice(3, 5), 16) / 255,
+    parseInt(hex.slice(5, 7), 16) / 255,
+  ];
+}
+
+export function getElementSize(element: HTMLElement): [number, number] {
+  return [element.clientWidth, element.clientHeight];
+}
+
+export function getCenterAlignXY(element: HTMLElement): [number, number] {
+  const parentElement = element.parentElement as HTMLElement | null;
+  if (!parentElement) return [0, 0];
+  const elementSize = getElementSize(element);
+  const xy = vec2.sub(elementSize, getElementSize(parentElement), elementSize);
+  return vec2.scale(xy, xy, 0.5 * dpr) as [number, number];
 }

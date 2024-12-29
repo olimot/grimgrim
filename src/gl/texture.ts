@@ -1,12 +1,11 @@
-import { vec2 } from "gl-matrix";
-
-export interface GLTextureInfo {
+export interface GLTextureInfo<
+  T extends ArrayBufferView<ArrayBufferLike> = ArrayBufferView<ArrayBufferLike>,
+> {
   gl: WebGL2RenderingContext;
   texture: WebGLTexture;
   framebuffer: WebGLFramebuffer;
-  data: ArrayBufferView<ArrayBufferLike>;
-  position: vec2;
-  size: vec2;
+  data: T;
+  size: [number, number];
   format: GLenum;
   internalFormat: GLenum;
   type: GLenum;
@@ -16,8 +15,11 @@ export interface TexImageSourceProp {
   src: TexImageSource;
 }
 
-export interface ArrayBufferImage {
-  data?: ArrayBufferView<ArrayBufferLike> | null;
+export interface BufferImage<
+  T extends ArrayBufferView<ArrayBufferLike> = ArrayBufferView<ArrayBufferLike>,
+> {
+  fill?: number[] | Uint8Array | Uint8ClampedArray;
+  data?: T | null;
   width: number;
   height: number;
   format?: GLenum;
@@ -25,9 +27,89 @@ export interface ArrayBufferImage {
   type?: GLenum;
 }
 
+export interface ConcreteBufferImage<
+  T extends ArrayBufferView<ArrayBufferLike> = ArrayBufferView<ArrayBufferLike>,
+> {
+  fill?: number[] | Uint8Array | Uint8ClampedArray;
+  data: T;
+  width: number;
+  height: number;
+  format?: GLenum;
+  internalFormat?: GLenum;
+  type?: GLenum;
+}
+
+export function texImage(
+  info: GLTextureInfo,
+  image: TexImageSourceProp | BufferImage,
+) {
+  const { gl } = info;
+
+  gl.bindTexture(gl.TEXTURE_2D, info.texture);
+
+  if ("width" in image) {
+    info.size[0] = image.width;
+    info.size[1] = image.height;
+    if (image.data) {
+      info.data = image.data;
+    } else {
+      const newData = new Uint8ClampedArray(info.size[0] * info.size[1] * 4);
+      const isRGB = image.fill?.length === 3;
+      for (let i = 0; image.fill && i < newData.length; i += 4) {
+        newData.set(image.fill, i);
+        if (isRGB) newData[i + 3] = 255;
+      }
+      info.data = newData;
+    }
+    if (image.internalFormat) info.internalFormat = image.internalFormat;
+    if (image.format) info.format = image.format;
+    if (image.type) info.type = image.type;
+
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      info.internalFormat,
+      info.size[0],
+      info.size[1],
+      0,
+      info.format,
+      info.type,
+      info.data,
+    );
+  } else {
+    const { src } = image;
+    if ("width" in src) {
+      info.size[0] = src.width;
+      info.size[1] = src.height;
+    } else {
+      info.size[0] = src.codedWidth;
+      info.size[1] = src.codedHeight;
+    }
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    if ("data" in src) {
+      info.data = src.data;
+    } else {
+      info.data = new Uint8ClampedArray(info.size[0] * info.size[1] * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, info.framebuffer);
+      gl.viewport(0, 0, info.size[0], info.size[1]);
+      gl.readPixels(
+        0,
+        0,
+        info.size[0],
+        info.size[1],
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        info.data,
+      );
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+  }
+}
+
 export function createTexture(
   gl: WebGL2RenderingContext,
-  image: TexImageSourceProp | ArrayBufferImage,
+  image: TexImageSourceProp | BufferImage,
 ): GLTextureInfo {
   const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
@@ -39,49 +121,28 @@ export function createTexture(
   gl.framebufferTexture2D(fbTarget, attachment, gl.TEXTURE_2D, texture, 0);
   gl.bindFramebuffer(fbTarget, null);
 
-  let width = 0;
-  let height = 0;
-  let int: GLenum = gl.RGBA;
-  let format: GLenum = gl.RGBA;
-  let type: GLenum = gl.UNSIGNED_BYTE;
-  let data: ArrayBufferView<ArrayBufferLike>;
-  if ("width" in image) {
-    ({ width, height } = image);
-    data = image.data ?? new Uint8ClampedArray(width * height * 4);
-    if (image.internalFormat) int = image.internalFormat;
-    if (image.format) format = image.format;
-    if (image.type) type = image.type;
-    gl.texImage2D(gl.TEXTURE_2D, 0, int, width, height, 0, format, type, data);
-  } else {
-    const { src } = image;
-    if ("width" in src) ({ width, height } = src);
-    else ({ codedWidth: width, codedHeight: height } = src);
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
-    if ("data" in src) {
-      ({ data } = src);
-    } else {
-      data = new Uint8ClampedArray(width * height * 4);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
-      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
-  }
+  const info: GLTextureInfo = {
+    gl,
+    texture,
+    framebuffer,
+    data: null!,
+    size: [0, 0],
+    internalFormat: gl.RGBA,
+    format: gl.RGBA,
+    type: gl.UNSIGNED_BYTE,
+  };
+
+  texImage(info, image);
 
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-  return {
-    gl,
-    texture,
-    framebuffer,
-    data,
-    position: vec2.create(),
-    size: vec2.fromValues(width, height),
-    internalFormat: int,
-    format,
-    type,
-  };
+  return info;
+}
+
+export function getImageData(layer: GLTextureInfo) {
+  const data = layer.data as unknown as Uint8ClampedArray;
+  return new ImageData(data, layer.size[0], layer.size[1]);
 }
