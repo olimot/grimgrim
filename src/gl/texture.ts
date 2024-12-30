@@ -1,11 +1,12 @@
+import { Rect } from "../util";
+
 export interface GLTextureInfo<
   T extends ArrayBufferView<ArrayBufferLike> = ArrayBufferView<ArrayBufferLike>,
-> {
+> extends Rect {
   gl: WebGL2RenderingContext;
   texture: WebGLTexture;
   framebuffer: WebGLFramebuffer;
   data: T;
-  size: [number, number];
   format: GLenum;
   internalFormat: GLenum;
   type: GLenum;
@@ -65,17 +66,8 @@ export function texImage(
     if (image.format) info.format = image.format;
     if (image.type) info.type = image.type;
 
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      info.internalFormat,
-      info.size[0],
-      info.size[1],
-      0,
-      info.format,
-      info.type,
-      info.data,
-    );
+    const { internalFormat: ifmt, size, format, type, data } = info;
+    gl.texImage2D(gl.TEXTURE_2D, 0, ifmt, ...size, 0, format, type, data);
   } else {
     const { src } = image;
     if ("width" in src) {
@@ -85,7 +77,7 @@ export function texImage(
       info.size[0] = src.codedWidth;
       info.size[1] = src.codedHeight;
     }
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
     if ("data" in src) {
       info.data = src.data;
@@ -93,15 +85,7 @@ export function texImage(
       info.data = new Uint8ClampedArray(info.size[0] * info.size[1] * 4);
       gl.bindFramebuffer(gl.FRAMEBUFFER, info.framebuffer);
       gl.viewport(0, 0, info.size[0], info.size[1]);
-      gl.readPixels(
-        0,
-        0,
-        info.size[0],
-        info.size[1],
-        gl.RGBA,
-        gl.UNSIGNED_BYTE,
-        info.data,
-      );
+      gl.readPixels(0, 0, ...info.size, gl.RGBA, gl.UNSIGNED_BYTE, info.data);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     }
   }
@@ -126,6 +110,7 @@ export function createTexture(
     texture,
     framebuffer,
     data: null!,
+    xy: [0, 0],
     size: [0, 0],
     internalFormat: gl.RGBA,
     format: gl.RGBA,
