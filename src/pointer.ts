@@ -1,27 +1,28 @@
 import { dpr } from "./util";
 
 export function getPointerInfo(event: PointerEvent) {
-  const { offsetX: x, offsetY: y, movementX: dx, movementY: dy } = event;
+  const { clientX: x, clientY: y, movementX: dx, movementY: dy } = event;
   const offset: [number, number] = [x * dpr, y * dpr];
   const delta: [number, number] = [dx * dpr, dy * dpr];
   return [offset, delta] as const;
 }
 
-export function managePointer(
-  target: HTMLElement,
-  callback: (e: PointerEvent) => unknown,
-) {
+export function managePointer(callback: (e: PointerEvent) => unknown) {
   let activePointerId = -1;
 
   const capture = (event: PointerEvent) => {
     if (event.type === "pointerdown") {
-      if (event.target !== target) return;
       activePointerId = event.pointerId;
     }
 
     if (activePointerId === event.pointerId) {
       event.preventDefault();
-      callback(event);
+      const coalescedEvents = event.getCoalescedEvents();
+      if (coalescedEvents.length) {
+        for (const event of coalescedEvents) callback(event);
+      } else {
+        callback(event);
+      }
     }
   };
 
@@ -32,20 +33,17 @@ export function managePointer(
     }
   };
 
-  const prevTouchAction = target.style.touchAction;
-  target.style.touchAction = "none";
+  const preventDefault = (e: MouseEvent) => !e.ctrlKey && e.preventDefault();
+
   window.addEventListener("pointerdown", capture);
   window.addEventListener("pointermove", capture);
   window.addEventListener("pointerup", release);
-  window.addEventListener(
-    "contextmenu",
-    (e) => !e.ctrlKey && e.preventDefault(),
-  );
+  window.addEventListener("contextmenu", preventDefault);
 
   return () => {
     window.removeEventListener("pointerdown", capture);
     window.removeEventListener("pointermove", capture);
     window.removeEventListener("pointerup", release);
-    target.style.touchAction = prevTouchAction;
+    window.removeEventListener("contextmenu", preventDefault);
   };
 }

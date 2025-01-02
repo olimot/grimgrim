@@ -1,3 +1,4 @@
+import { ReadonlyVec2 } from "gl-matrix";
 import { Rect } from "../util";
 
 export interface GLTextureInfo<
@@ -13,6 +14,7 @@ export interface GLTextureInfo<
 }
 
 export interface TexImageSourceProp {
+  xy?: ReadonlyVec2;
   src: TexImageSource;
 }
 
@@ -21,6 +23,7 @@ export interface BufferImage<
 > {
   fill?: number[] | Uint8Array | Uint8ClampedArray;
   data?: T | null;
+  xy?: ReadonlyVec2;
   width: number;
   height: number;
   format?: GLenum;
@@ -110,7 +113,7 @@ export function createTexture(
     texture,
     framebuffer,
     data: null!,
-    xy: [0, 0],
+    xy: [image.xy?.[0] ?? 0, image.xy?.[1] ?? 0],
     size: [0, 0],
     internalFormat: gl.RGBA,
     format: gl.RGBA,
@@ -119,8 +122,8 @@ export function createTexture(
 
   texImage(info, image);
 
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 

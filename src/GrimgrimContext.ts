@@ -1,28 +1,16 @@
 import { mat3, ReadonlyVec2, vec2, vec3 } from "gl-matrix";
 import { createPrograms, GLProgramInfo } from "./gl/program";
-import {
-  BufferImage,
-  createTexture,
-  getImageData,
-  GLTextureInfo,
-  TexImageSourceProp,
-} from "./gl/texture";
+import { createTexture, getImageData, GLTextureInfo } from "./gl/texture";
 import BrushShader from "./shader/BrushShader";
-import ImageShader from "./shader/ImageShader";
-import {
-  dpr,
-  drawImageMatrix,
-  hexColor,
-  Rect,
-  scaleFromOrigin,
-  Transform,
-} from "./util";
 import CheckerboardShader from "./shader/CheckerboardShader";
+import ImageShader from "./shader/ImageShader";
+import { dpr, drawImageMatrix, hexColor, Rect, Transform } from "./util";
 
 export interface Layer extends GLTextureInfo {
   id: number;
   name: string;
   locked?: boolean;
+  viewSize?: [number, number];
 }
 
 const m3tmp = mat3.create();
@@ -37,12 +25,12 @@ export default class GrimgrimContext {
   private readonly programs: GLProgramInfo[];
   private readonly drawing: GLTextureInfo;
   readonly content: GLTextureInfo;
+  readonly selection: GLTextureInfo;
   readonly layers: Layer[] = [];
   readonly selectedLayers: Layer[] = [];
   activeLayer: Layer;
-  color = "#000000";
-  size = "32";
-  hardness = "50";
+  readonly brush = { color: "#000000", size: "8", hardness: "50" };
+  private brushXY = vec2.create();
 
   constructor(public readonly element: HTMLElement) {
     const canvas = document.createElement("canvas");
@@ -55,6 +43,9 @@ export default class GrimgrimContext {
     canvas.style.height = `${canvas.height / dpr}px`;
     canvas.style.transformOrigin = "left top";
     canvas.style.pointerEvents = "none";
+    canvas.style.touchAction = "none";
+    
+    element.style.touchAction = "none";
     element.appendChild(canvas);
 
     const viewW = element.clientWidth * dpr;
@@ -62,8 +53,9 @@ export default class GrimgrimContext {
     this.viewBox = Rect([0, canvas.height - viewH], [viewW, viewH]);
 
     const gl = canvas.getContext("webgl2") as WebGL2RenderingContext;
-    // 770 = gl.SRC_ALPHA, 771 = gl.ONE_MINUS_SRC_ALPHA, 1 = gl.ONE
-    gl.blendFuncSeparate(770, 771, 1, 771);
+
+    // prettier-ignore
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.enable(gl.BLEND);
 
     const fill = [255, 255, 255, 0];
@@ -71,18 +63,16 @@ export default class GrimgrimContext {
 
     this.canvas = canvas;
     this.gl = gl;
-    this.content = createTexture(gl, initialContent);
-    this.drawing = createTexture(gl, {
-      width: initialContent.width,
-      height: initialContent.height,
-    });
+    this.content = createTexture(gl, { ...initialContent, fill: void 0 });
+    this.drawing = createTexture(gl, { ...initialContent, fill: void 0 });
+    this.selection = createTexture(gl, { ...initialContent, fill: void 0 });
     this.programs = createPrograms(gl, [
       CheckerboardShader,
       ImageShader,
       BrushShader,
     ]);
 
-    this.activeLayer = this.addLayer(initialContent);
+    this.activeLayer = this.addLayer(createTexture(gl, initialContent));
     this.activeLayer.locked = true;
     this.selectedLayers = [this.activeLayer];
 
@@ -90,9 +80,16 @@ export default class GrimgrimContext {
     this.view = Transform();
     this.resetView();
     this.render();
+
+    new ResizeObserver(() => {
+      const viewW = element.clientWidth * dpr;
+      const viewH = element.clientHeight * dpr;
+      vec2.set(this.viewBox.xy, 0, canvas.height - viewH);
+      vec2.set(this.viewBox.size, viewW, viewH);
+    }).observe(element);
   }
 
-  applyViewToTransform() {
+  updateView() {
     vec2.copy(this.contentBox.xy, this.view.translation);
     vec2.scale(this.contentBox.size, this.content.size, this.view.scale);
     this.render();
@@ -101,18 +98,8 @@ export default class GrimgrimContext {
   resetView() {
     vec2.sub(this.view.translation, this.viewBox.size, this.content.size);
     vec2.scale(this.view.translation, this.view.translation, 0.5);
-    this.applyViewToTransform();
-  }
-
-  translateView(delta: ReadonlyVec2) {
-    vec2.add(this.view.translation, this.view.translation, delta);
-    this.applyViewToTransform();
-  }
-
-  scaleView(origin: ReadonlyVec2, r: number) {
-    scaleFromOrigin(this.view.translation, this.view.translation, r, origin);
-    this.view.scale *= r;
-    this.applyViewToTransform();
+    this.view.scale = 1;
+    this.updateView();
   }
 
   render() {
@@ -141,7 +128,7 @@ export default class GrimgrimContext {
       }
     }
 
-    drawImageMatrix(m3tmp, this.contentBox, this.viewBox);
+    drawImageMatrix(m3tmp, this.contentBox, Rect([0, 0], this.viewBox.size));
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(...this.viewBox.xy, ...this.viewBox.size);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -159,13 +146,18 @@ export default class GrimgrimContext {
     gl.drawArrays(imageShader.mode, 0, imageShader.arrayCount);
   }
 
-  addLayer(img: TexImageSourceProp | BufferImage, name?: string) {
-    const texture = createTexture(this.gl, img);
+  addLayer(texture: GLTextureInfo, name?: string) {
     const id = Math.max(-1, ...this.layers.map((it) => it.id)) + 1;
-    name ??= `레이어 ${id}`;
-    const layer: Layer = { ...texture, id, name, xy: [0, 0] };
+    const layer = Object.assign(texture, { id, name: name ?? `레이어 ${id}` });
     this.layers.push(layer);
     this.activeLayer = layer;
+    return layer;
+  }
+
+  deleteLayer(layer: Layer) {
+    const index = this.layers.indexOf(layer);
+    if (index === -1) return null;
+    this.layers.splice(index, 1);
     return layer;
   }
 
@@ -207,58 +199,160 @@ export default class GrimgrimContext {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  private brushXY = vec2.create();
-
   beginBrush(xy: ReadonlyVec2) {
-    const color = hexColor(this.color);
-    const hardness = Number(this.hardness) / 100;
-    const size = Number(this.size);
-    vec2.copy(this.brushXY, xy);
-    this.stepBrush(this.brushXY, color, size, hardness);
+    const color = hexColor(this.brush.color);
+    const hardness = Number(this.brush.hardness) / 100;
+    const size = Number(this.brush.size);
+    this.stepBrush(vec2.copy(this.brushXY, xy), color, size, hardness);
     this.render();
   }
 
   strokeBrush(xy: ReadonlyVec2) {
-    const color = hexColor(this.color);
-    const hardness = Number(this.hardness) / 100;
-    const size = Number(this.size);
+    const color = hexColor(this.brush.color);
+    const hardness = Number(this.brush.hardness) / 100;
+    const size = Number(this.brush.size);
+    if (!size) return;
 
     const spacing = size / 4;
     const dxy = vec2.sub(vec2.create(), xy, this.brushXY);
     const distance = vec2.len(dxy);
+
     const nDots = Math.floor(distance / spacing);
     if (!nDots) return;
 
     const dxydt = vec2.scale(dxy, dxy, spacing / distance);
-    const step = this.brushXY;
+    const { brushXY } = this;
+
     for (let i = 0; i < nDots; i++) {
-      this.stepBrush(vec2.add(step, step, dxydt), color, size, hardness);
+      this.stepBrush(vec2.add(brushXY, brushXY, dxydt), color, size, hardness);
     }
 
     this.render();
   }
 
   endBrush() {
-    const { gl, drawing } = this;
-    const imageShader = this.programs[1];
-    const uTransformLoc = imageShader.uniformLocation.transform;
-    const [x, y] = this.activeLayer.xy;
-    drawImageMatrix(m3tmp, Rect([-x, -y], drawing.size), this.activeLayer);
+    const { gl } = this;
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.activeLayer.framebuffer);
-    gl.viewport(0, 0, ...this.activeLayer.size);
-
-    gl.useProgram(imageShader.program);
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, drawing.texture);
-    gl.uniformMatrix3fv(uTransformLoc, false, m3tmp);
-    gl.drawArrays(imageShader.mode, 0, imageShader.arrayCount);
+    this.mergeTextures(this.drawing, this.activeLayer);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.drawing.framebuffer);
     gl.viewport(0, 0, ...this.drawing.size);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
     this.render();
+  }
+
+  mergeTextures(src: GLTextureInfo, dst: GLTextureInfo) {
+    const { gl } = this;
+    const imageShader = this.programs[1];
+    const uTransformLoc = imageShader.uniformLocation.transform;
+
+    const xy = vec2.min([0, 0], dst.xy, src.xy);
+    const srcBottomRight = vec2.add([0, 0], src.xy, src.size);
+    const dstBottomRight = vec2.add([0, 0], dst.xy, dst.size);
+    const bottomRight = vec2.max([0, 0], srcBottomRight, dstBottomRight);
+    const [width, height] = vec2.sub(bottomRight, bottomRight, xy);
+    const newImage = createTexture(gl, { width, height, xy });
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, newImage.framebuffer);
+    gl.viewport(0, 0, ...newImage.size);
+
+    gl.useProgram(imageShader.program);
+    gl.activeTexture(gl.TEXTURE0);
+
+    drawImageMatrix(m3tmp, dst, newImage);
+    gl.bindTexture(gl.TEXTURE_2D, dst.texture);
+    gl.uniformMatrix3fv(uTransformLoc, false, m3tmp);
+    gl.drawArrays(imageShader.mode, 0, imageShader.arrayCount);
+
+    drawImageMatrix(m3tmp, this.drawing, newImage);
+    gl.bindTexture(gl.TEXTURE_2D, src.texture);
+    gl.uniformMatrix3fv(uTransformLoc, false, m3tmp);
+    gl.drawArrays(imageShader.mode, 0, imageShader.arrayCount);
+
+    Object.assign(dst, newImage);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dst.framebuffer);
+    gl.viewport(0, 0, dst.size[0], dst.size[1]);
+    gl.readPixels(0, 0, ...dst.size, gl.RGBA, gl.UNSIGNED_BYTE, dst.data);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    return dst;
+  }
+
+  resizeTexture(src: GLTextureInfo, size: ReadonlyVec2) {
+    const { gl } = this;
+    const imageShader = this.programs[1];
+    const uTransformLoc = imageShader.uniformLocation.transform;
+
+    const newImage = createTexture(gl, { width: size[0], height: size[1] });
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, newImage.framebuffer);
+    gl.viewport(0, 0, ...newImage.size);
+
+    gl.useProgram(imageShader.program);
+    gl.activeTexture(gl.TEXTURE0);
+
+    gl.bindTexture(gl.TEXTURE_2D, src.texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    gl.uniformMatrix3fv(uTransformLoc, false, mat3.identity(m3tmp));
+    gl.drawArrays(imageShader.mode, 0, imageShader.arrayCount);
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+    vec2.copy(newImage.xy, src.xy);
+    Object.assign(src, newImage);
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, src.framebuffer);
+    gl.viewport(0, 0, src.size[0], src.size[1]);
+    gl.readPixels(0, 0, ...src.size, gl.RGBA, gl.UNSIGNED_BYTE, src.data);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    return src;
+  }
+
+  resizeLayer(layer: Layer, size: ReadonlyVec2) {
+    this.resizeTexture(layer, size);
+    this.render();
+  }
+
+  resizeContent(size: ReadonlyVec2) {
+    const scale = vec2.div([1, 1], size, this.content.size);
+    console.log(scale);
+    const sizeTemp = vec2.create();
+    for (const layer of this.layers) {
+      this.resizeTexture(layer, vec2.mul(sizeTemp, layer.size, scale));
+    }
+    this.expandContent(size);
+    this.resetView();
+    this.render();
+  }
+
+  expandContent(size: ReadonlyVec2) {
+    const empty = { width: size[0], height: size[1] };
+    Object.assign(this.content, createTexture(this.gl, empty));
+    Object.assign(this.drawing, createTexture(this.gl, empty));
+    Object.assign(this.selection, createTexture(this.gl, empty));
+    this.resetView();
+    this.render();
+  }
+
+  toViewBoxCoord(xy: ReadonlyVec2, out = vec2.create()) {
+    vec2.scale(out, xy, this.view.scale);
+    vec2.add(out, out, this.view.translation);
+    return out;
+  }
+
+  toCSSRect(rect: Rect & { viewSize?: [number, number] }, out = Rect()) {
+    vec2.scale(out.size, rect.viewSize ?? rect.size, this.view.scale);
+    vec2.scale(out.xy, rect.xy, this.view.scale);
+    vec2.add(out.xy, out.xy, this.view.translation);
+    vec2.scale(out.xy, out.xy, 1 / dpr);
+    vec2.scale(out.size, out.size, 1 / dpr);
+    return out;
   }
 
   getImageData() {

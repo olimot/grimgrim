@@ -9,7 +9,8 @@ import fullVert from "../shader/full.vert?raw";
 import simpleFrag from "../shader/simple.frag?raw";
 import checkerboardFrag from "../shader/checkerboard.frag?raw";
 import rectangleVert from "../shader/rectangle.vert?raw";
-import { vec2 } from "gl-matrix";
+import { mat3, vec2 } from "gl-matrix";
+import { drawImageMatrix } from "../util";
 
 export default function canvas2() {
   const canvas = document.getElementById("canvas-2");
@@ -17,7 +18,10 @@ export default function canvas2() {
   normalizeCanvasSize(canvas);
   const gl = canvas.getContext("webgl2");
   assert(gl instanceof WebGL2RenderingContext);
-  const viewport = [gl.drawingBufferWidth, gl.drawingBufferHeight];
+  const viewport = [gl.drawingBufferWidth, gl.drawingBufferHeight] as [
+    number,
+    number,
+  ];
   gl.blendFuncSeparate(
     gl.SRC_ALPHA,
     gl.ONE_MINUS_SRC_ALPHA,
@@ -109,32 +113,32 @@ export default function canvas2() {
       label: "배경",
       data: img0,
       texture: layer0tex,
-      topLeft: vec2.create(),
-      size: [canvas.width, canvas.height],
+      xy: vec2.create(),
+      size: [canvas.width, canvas.height] as [number, number],
     },
     {
       id: 1,
       label: "레이어 1",
       data: img1,
       texture: layer1tex,
-      topLeft: vec2.create(),
-      size: [canvas.width, canvas.height],
+      xy: vec2.create(),
+      size: [canvas.width, canvas.height] as [number, number],
     },
     {
       id: 2,
       label: "레이어 2",
       data: img2,
       texture: layer2tex,
-      topLeft: vec2.create(),
-      size: [canvas.width, canvas.height],
+      xy: vec2.create(),
+      size: [canvas.width, canvas.height] as [number, number],
     },
     {
       id: 3,
       label: "레이어 3",
       data: img3,
       texture: layer3tex,
-      topLeft: vec2.create(),
-      size: [canvas.width, canvas.height],
+      xy: vec2.create(),
+      size: [canvas.width, canvas.height] as [number, number],
     },
   ];
 
@@ -151,8 +155,9 @@ export default function canvas2() {
   gl.uniform2fv(gl.getUniformLocation(rectangle, "viewport"), viewport);
   gl.uniform2fv(gl.getUniformLocation(rectangle, "srcSize"), viewport);
   gl.uniform1i(gl.getUniformLocation(rectangle, "srcTexture"), 0);
-  const uTopLeftLoc = gl.getUniformLocation(rectangle, "topLeft");
+  const uTransform = gl.getUniformLocation(rectangle, "transform");
 
+  const transform = mat3.create();
   const draw = () => {
     // Draw checkerboard
     gl.useProgram(checkerboard);
@@ -163,7 +168,8 @@ export default function canvas2() {
     for (const layer of layers) {
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, layer.texture);
-      gl.uniform2fv(uTopLeftLoc, layer.topLeft);
+      drawImageMatrix(transform, layer, { size: viewport });
+      gl.uniformMatrix3fv(uTransform, false, transform);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
   };
@@ -187,8 +193,8 @@ export default function canvas2() {
       const selected = layers.toReversed().find((layer) => {
         const x = Math.floor(p1[0]);
         const y = Math.floor(p1[1]);
-        const dataX = Math.floor(x - layer.topLeft[0]);
-        const dataY = Math.floor(y - layer.topLeft[1]);
+        const dataX = Math.floor(x - layer.xy[0]);
+        const dataY = Math.floor(y - layer.xy[1]);
         if (dataX < 0 || dataX >= layer.data.width - 1) return false;
         if (dataY < 0 || dataY >= layer.data.height - 1) return false;
         const pixelOffset = (dataY * layer.data.width + dataX) * 4;
@@ -201,7 +207,7 @@ export default function canvas2() {
         if (radio) radio.checked = true;
       }
     }
-    vec2.add(activeLayer.topLeft, activeLayer.topLeft, dp);
+    vec2.add(activeLayer.xy, activeLayer.xy, dp);
     draw();
   });
   canvas.style.cursor = "move";

@@ -128,10 +128,11 @@ export function resetTransform(transform: Transform) {
 
 export function drawImageMatrix(
   out: mat3,
-  src: { xy: vec2; size: vec2 },
-  dst: { size: vec2 },
+  src: { xy: vec2; size: vec2; viewSize?: vec2 },
+  dst: { xy?: vec2; size: vec2 },
 ) {
-  const { xy, size } = src;
+  const { xy } = src;
+  const size = src.viewSize ?? src.size;
   mat3.fromScaling(out, [size[0] / dst.size[0], size[1] / dst.size[1]]);
 
   const denom = vec2.clone(dst.size);
@@ -140,6 +141,7 @@ export function drawImageMatrix(
   vec2.sub(p, p, dst.size);
   vec2.scale(p, p, 0.5);
   vec2.add(p, p, xy);
+  if (dst.xy) vec2.sub(p, p, dst.xy);
   vec2.div(p, p, denom);
   return mat3.mul(out, mat3.fromTranslation(mat3.create(), p), out);
 }
